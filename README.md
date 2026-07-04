@@ -72,9 +72,10 @@ sequenceDiagram
 
 ## Quickstart
 
-Prerequisites: [uv](https://docs.astral.sh/uv/) and Node 20+. Docker only if
-you want Grafana/memory (`make infra-up`). No hardware and no API key needed
-for the full mock demo.
+Prerequisites: [uv](https://docs.astral.sh/uv/), Node 20+, and — only for the
+observability/memory stack — [Docker](https://docs.docker.com/get-docker/)
+with the daemon running (Docker Desktop or Colima on macOS). No hardware and
+no API key needed for the full mock demo.
 
 ```bash
 # one-time setup
@@ -89,12 +90,22 @@ make demo        # backend :8000 (mock) + frontend :5173
 #    open http://localhost:5173  →  "> enter the console"
 #    or fixtures-only, no backend at all: http://localhost:5173/app?mock=1
 
-# 2. real everything (optional, independent switches)
+# 2. observability + memory (optional; needs the Docker daemon running)
+make infra-up    # docker compose: grafana/otel-lgtm (Grafana :3000, OTLP
+                 #   :4317/:4318) + agent-memory-server :8100 + redis :6379;
+                 #   first run pulls ~1.5 GB of images — start it early.
+                 # the SelfAware · Commission Theater dashboard auto-provisions;
+                 # backend traces appear under service "selfaware-backend"
+make infra-down  # stop the stack (add -v in infra/ to also drop redis data)
+
+# 3. real everything (each switch independent — see degradation matrix)
 cp .env.example .env             # add ANTHROPIC_API_KEY for the real author
-make infra-up                    # redis + agent-memory :8100 + grafana :3000
 make dev-backend                 # plug in the Pico W first; port auto-discovered
 make dev-frontend
 ```
+
+The backend never *requires* the containers: if the stack is down, traces are
+dropped silently and memory degrades to a no-op client.
 
 | | |
 |---|---|
