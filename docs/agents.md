@@ -60,3 +60,45 @@ per-connection and passed as `message_history`.
 fails loudly. `TestModel` proves schemas/instructions render keyless;
 `FunctionModel`/callable authors drive the full commission-loop test
 (gate-reject → board-traceback → pass) against the scripted MockBoard.
+
+## MCP transport (`mcp_server.py`) — external agents, not just the copilot
+
+The copilot is one, first-party consumer of `read_<slug>`/`set_<slug>`. MCP
+is how *any* agent — Claude Desktop, a different vendor's agent, a script —
+gets the same capability, without being written into this codebase. Two
+design decisions worth knowing before touching this:
+
+- **A SEPARATE process, not mounted into `create_app()`.** Mounting a
+  Streamable HTTP MCP server inside an existing ASGI app is a documented,
+  currently-unresolved limitation of the MCP Python SDK (redirect loops,
+  "Task group is not initialized" — see
+  `modelcontextprotocol/python-sdk#1367`). `mcp_server.py` runs standalone
+  (`mcp.run_async(transport="http", ...)`, the SDK's own supported mode) and
+  talks to the main backend over the network instead of touching
+  `BoardSession`/`DriverRegistry` directly — which also means it can never
+  violate the single-lock invariant (`hardware/session.py`); it's just
+  another caller on the existing REST surface, same as the frontend.
+- **Bearer-token gated, fails closed.** `POST /api/drivers/{slug}/read` and
+  `/set` (`api/rest.py`) are the only two endpoints that can touch real
+  hardware from outside the process. `SELFAWARE_MCP_TOKEN` unset means those
+  endpoints refuse every request (403) — never "open to anyone," the same
+  honest-degrade posture as everything else here, just at a boundary where
+  the failure mode is real actuation instead of a blank dashboard widget.
+
+Tool lifecycle: `mcp_server.py` seeds from `GET /api/drivers` at startup,
+then listens on `/ws` for `driver.registered`/`driver.updated` and
+re-fetches `GET /api/drivers/{slug}` on either — one reconciliation path,
+not two — because `DriverUpdatedPayload` carries no `protocol_class`, so a
+repair that flips a slug between read and set can only be detected by
+re-fetching the record, not by trusting the event payload alone. A `slug →
+tool_kind` map (`_armed`) is what lets that reconciliation remove a stale
+`read_<slug>` and arm `set_<slug>` instead of leaving a broken tool name
+behind.
+
+Honesty floor for callers we don't own: an external agent's system prompt is
+outside our control, so the guardrail travels with the data instead —
+every tool description and every response payload states the reading is
+live, taken at call time, not cached.
+
+Run it: `make dev-mcp` (needs `SELFAWARE_MCP_TOKEN` set the same in both
+`.env` and wherever the main backend reads it — see `.env.example`).

@@ -32,10 +32,43 @@ last-resort fallback.
 7. **The glass brain (Grafana).** Open the Commission Theater dashboard: the
    trace waterfall of the exact commission the judges just watched —
    generate/validate/deploy/test spans, the failed attempt, token usage.
-8. **Close with the honesty floor.** Tractable: analog reads, self-identifying
+8. **An agent that isn't ours, over MCP.** Switch windows entirely to Claude
+   Desktop (a separate process, connected via MCP — see setup below), open a
+   **fresh** conversation, and ask "what's the light level right now?" It
+   discovers `read_ldr` on its own and reports the live value — proof that a
+   process you don't control just used the hardware. Cover the sensor, ask
+   again, show the value change: liveness, but witnessed by an agent that
+   isn't SelfAware's own UI. Narrate: *"MCP is the difference between 'our
+   chatbot can read a sensor' and 'any agent can gain a verified physical
+   capability' — that's the admission layer, not the transport layer."*
+9. **Close with the honesty floor.** Tractable: analog reads, self-identifying
    bus devices, single-pulse timing. Hard: multi-register state machines,
    bit-banged timing. Impossible: "auto-detect anything." Saying this is what
    makes the rest believable.
+
+## Setting up the MCP beat (do this before judges arrive, not during)
+
+1. Set the **same** `SELFAWARE_MCP_TOKEN` in `.env` (read by the main
+   backend) — `mcp_server.py` reads it from its own process environment, so
+   export it in the shell you launch `make dev-mcp` from too.
+2. `make dev-backend` (or `make demo-mock` for the keyless path), then
+   `make dev-mcp` in a second terminal — two processes, on purpose (see
+   `docs/agents.md`: mounting MCP into the main app hits a documented SDK
+   bug).
+3. Add the server to Claude Desktop's config (`claude_desktop_config.json`),
+   pointing at `http://127.0.0.1:8001/mcp`, and restart Claude Desktop so it
+   picks up the connection.
+4. **Verify before judges see it, don't hope:** commission a sensor first,
+   then confirm Claude Desktop actually lists `read_<slug>` as an available
+   tool. Whether an already-open conversation picks up a *newly* commissioned
+   sensor without restarting is untested against Claude Desktop specifically
+   — rehearse that exact moment once, and if it doesn't push live, "ask in a
+   new conversation" is the rehearsed fallback, decided in advance, not
+   improvised on stage.
+5. Keep this beat sequenced, not interleaved with beat 4's `make demo-mock`
+   rehearsal: MockBoard's scripted fail→pass exchanges are consumed in
+   strict order, and a stray MCP-triggered read mid-rehearsal will desync
+   the script.
 
 ## Making the first failure deterministic (never hope for a hallucination)
 

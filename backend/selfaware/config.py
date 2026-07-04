@@ -50,6 +50,15 @@ class Settings(BaseSettings):
     otlp_endpoint: str = "http://localhost:4318"  # grafana/otel-lgtm OTLP-HTTP; down -> spans drop silently
     sqlite_path: str = "selfaware.db"  # registry snapshot + optional sqlite-vec
 
+    # --- MCP transport (separate process; api/rest.py + mcp_server.py) ---------
+    # Gates the two endpoints that can touch real hardware (/api/drivers/{slug}
+    # /read, /set). Empty means "not configured" — those endpoints then fail
+    # closed (403), never silently open. mcp_server.py is a SEPARATE process
+    # (see its module docstring for why) and reads SELFAWARE_MCP_* env vars
+    # directly rather than through this class; this is the only one of those
+    # knobs the main backend itself needs, to check incoming requests against.
+    mcp_token: str = ""
+
     # --- PicoBricks pin map: CONFIG VALUES, not constants ----------------------
     # Board revisions differ; flagged pins are UNCONFIRMED and must be checked
     # against the physical board on build day (docs/hardware-bringup.md).
