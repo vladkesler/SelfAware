@@ -1,0 +1,35 @@
+/**
+ * Design tokens — a dark instrument in a quiet room, not a SaaS dashboard.
+ * Three surface steps, hairlines instead of shadows, ONE phosphor accent,
+ * one RESERVED alert red (tracebacks + failure states, nothing else).
+ * The build-day craft pass works directly against this file.
+ */
+
+:root {
+  /* surfaces — near-black, warm-neutral, three steps only */
+  --bg-void: #0a0b0d;
+  --bg-panel: #101216;
+  --bg-raised: #161a20;
+  --line: rgb(255 255 255 / 0.07); /* hairline borders, never shadows */
+
+  /* one phosphor accent (green CRT) + one reserved alert */
+  --phosphor: #3dffa0;
+  --phosphor-dim: #1e7a52;
+  --phosphor-glow: rgb(61 255 160 / 0.35); /* text-shadow / box-shadow only */
+  --alert: #ff5c5c; /* RESERVED: verbatim tracebacks + failure states */
+
+  --text: #e7eaee;
+  --text-muted: #7c8591;
+
+  /* two voices */
+  --font-machine: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-voice: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* motion — events arrive as pulses; stages ignite; only the scope idles */
+  --pulse-ms: 180ms; /* arrival flash on panel chrome */
+  --stage-ms: 320ms; /* stepper stage transitions */
+  --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --unit: 4px;
+  --radius: 4px; /* tight radii; instruments, not bubbles */
+}

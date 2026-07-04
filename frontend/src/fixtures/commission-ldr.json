@@ -1,0 +1,1163 @@
+[
+  {
+    "afterMs": 0,
+    "event": {
+      "v": 1,
+      "type": "system.hello",
+      "payload": {
+        "server_version": "0.1.0-fixture",
+        "protocol_v": 1,
+        "board": {
+          "connected": true,
+          "port_id": "mock",
+          "mock": true,
+          "busy": false
+        },
+        "drivers": []
+      }
+    }
+  },
+  {
+    "afterMs": 400,
+    "event": {
+      "v": 1,
+      "type": "board.status",
+      "payload": {
+        "connected": true,
+        "port_id": "mock",
+        "mock": true,
+        "busy": false
+      }
+    }
+  },
+  {
+    "afterMs": 900,
+    "event": {
+      "v": 1,
+      "type": "discovery.device_found",
+      "payload": {
+        "bus": "adc",
+        "pin": 27,
+        "confidence": "unknown"
+      }
+    }
+  },
+  {
+    "afterMs": 1200,
+    "event": {
+      "v": 1,
+      "type": "commission.started",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "slug": "ldr",
+        "display_name": "LDR photoresistor",
+        "protocol_class": "analog",
+        "pins": {
+          "adc": 27
+        },
+        "max_attempts": 4
+      }
+    }
+  },
+  {
+    "afterMs": 800,
+    "event": {
+      "v": 1,
+      "type": "agent.thought",
+      "payload": {
+        "agent": "driver_author",
+        "text": "Analog class on GP27 (ADC1). Driver plan: machine.ADC, one read_u16() per call, no busy-waits, no IRQs."
+      }
+    }
+  },
+  {
+    "afterMs": 700,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 1,
+        "stage": "generate",
+        "status": "started",
+        "detail": "authoring driver_code"
+      }
+    }
+  },
+  {
+    "afterMs": 1400,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 1,
+        "stage": "generate",
+        "status": "passed",
+        "detail": "42 lines, imports: machine"
+      }
+    }
+  },
+  {
+    "afterMs": 300,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 1,
+        "stage": "validate",
+        "status": "started",
+        "detail": "AST gate"
+      }
+    }
+  },
+  {
+    "afterMs": 700,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 1,
+        "stage": "validate",
+        "status": "passed",
+        "detail": "imports allowlisted, no while, Driver shape ok"
+      }
+    }
+  },
+  {
+    "afterMs": 300,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 1,
+        "stage": "deploy",
+        "status": "started",
+        "detail": "raw REPL exec"
+      }
+    }
+  },
+  {
+    "afterMs": 900,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 1,
+        "stage": "deploy",
+        "status": "passed",
+        "detail": "class Driver loaded on board"
+      }
+    }
+  },
+  {
+    "afterMs": 300,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 1,
+        "stage": "test",
+        "status": "started",
+        "detail": "host harness read"
+      }
+    }
+  },
+  {
+    "afterMs": 1100,
+    "event": {
+      "v": 1,
+      "type": "commission.traceback",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 1,
+        "stage": "test",
+        "traceback": "Traceback (most recent call last):\n  File \"<stdin>\", line 4, in <module>\nValueError: Pin GP15 does not have ADC capabilities"
+      }
+    }
+  },
+  {
+    "afterMs": 200,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 1,
+        "stage": "test",
+        "status": "failed",
+        "detail": "board raised ValueError"
+      }
+    }
+  },
+  {
+    "afterMs": 500,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 2,
+        "stage": "repair",
+        "status": "started",
+        "detail": "feeding verbatim traceback back to the author"
+      }
+    }
+  },
+  {
+    "afterMs": 900,
+    "event": {
+      "v": 1,
+      "type": "agent.thought",
+      "payload": {
+        "agent": "driver_author",
+        "text": "The board says GP15 has no ADC. I ignored the spec pins and hardcoded 15 \u2014 the spec maps adc\u219227. Rewriting with machine.ADC(machine.Pin(27))."
+      }
+    }
+  },
+  {
+    "afterMs": 600,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 2,
+        "stage": "repair",
+        "status": "passed",
+        "detail": "repair context built (attempt 2/4)"
+      }
+    }
+  },
+  {
+    "afterMs": 300,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 2,
+        "stage": "generate",
+        "status": "started",
+        "detail": "regenerating with failure context"
+      }
+    }
+  },
+  {
+    "afterMs": 1200,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 2,
+        "stage": "generate",
+        "status": "passed",
+        "detail": "41 lines, imports: machine"
+      }
+    }
+  },
+  {
+    "afterMs": 250,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 2,
+        "stage": "validate",
+        "status": "started",
+        "detail": "AST gate"
+      }
+    }
+  },
+  {
+    "afterMs": 600,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 2,
+        "stage": "validate",
+        "status": "passed",
+        "detail": "clean"
+      }
+    }
+  },
+  {
+    "afterMs": 250,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 2,
+        "stage": "deploy",
+        "status": "started",
+        "detail": "raw REPL exec"
+      }
+    }
+  },
+  {
+    "afterMs": 800,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 2,
+        "stage": "deploy",
+        "status": "passed",
+        "detail": "hot-swapped Driver"
+      }
+    }
+  },
+  {
+    "afterMs": 250,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 2,
+        "stage": "test",
+        "status": "started",
+        "detail": "host harness read"
+      }
+    }
+  },
+  {
+    "afterMs": 900,
+    "event": {
+      "v": 1,
+      "type": "commission.stage",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 2,
+        "stage": "test",
+        "status": "passed",
+        "detail": "read 31842 raw_u16 \u2014 plausible for analog"
+      }
+    }
+  },
+  {
+    "afterMs": 600,
+    "event": {
+      "v": 1,
+      "type": "commission.passed",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "slug": "ldr",
+        "attempts_used": 2,
+        "reading": 31842,
+        "unit": "raw_u16"
+      }
+    }
+  },
+  {
+    "afterMs": 500,
+    "event": {
+      "v": 1,
+      "type": "driver.registered",
+      "payload": {
+        "slug": "ldr",
+        "display_name": "LDR photoresistor",
+        "protocol_class": "analog",
+        "pins": {
+          "adc": 27
+        },
+        "tool_names": [
+          "read_ldr"
+        ],
+        "code_hash": "a3f9c2e17d40",
+        "unit": "raw_u16"
+      }
+    }
+  },
+  {
+    "afterMs": 157,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31027,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 144,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31109,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 137,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31240,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 152,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31387,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 146,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31526,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 147,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31726,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 164,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31700,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 161,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31781,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 164,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31798,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 155,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31923,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 161,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31820,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 148,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31856,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 156,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31862,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 146,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31734,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 161,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31563,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 143,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31564,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 165,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31346,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 155,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31244,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 161,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31078,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 138,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30982,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 159,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30914,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 158,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30649,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 136,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30602,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 151,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30476,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 149,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30244,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 143,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30268,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 136,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30171,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 165,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30061,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 149,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30128,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 146,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30157,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 153,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30207,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 144,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30176,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 162,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30357,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 146,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30422,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 140,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30392,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 140,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30659,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 163,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30745,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 151,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30898,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 141,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31000,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 150,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31241,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 145,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31347,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 136,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31441,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 155,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31572,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 143,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31626,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 157,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31834,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 144,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31878,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 144,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31876,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 153,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31902,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 144,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31804,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 159,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31805,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 152,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31795,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 156,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31790,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 153,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31551,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 160,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31422,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 157,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31315,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 138,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 31250,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 148,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30998,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 149,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30916,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 140,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30827,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 162,
+    "event": {
+      "v": 1,
+      "type": "sensor.reading",
+      "payload": {
+        "slug": "ldr",
+        "value": 30714,
+        "unit": "raw_u16",
+        "plausible": true
+      }
+    }
+  }
+]
