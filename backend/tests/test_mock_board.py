@@ -43,8 +43,8 @@ async def test_demo_script_yields_verbatim_traceback_then_reading() -> None:
     attempt1 = await board.exec("driver attempt 1", timeout_s=5.0)
     assert not attempt1.ok
     assert attempt1.stderr.startswith("Traceback (most recent call last):")
-    assert 'File "<stdin>", line 4, in <module>' in attempt1.stderr
-    assert "ValueError: Pin GP15 does not have ADC capabilities" in attempt1.stderr
+    assert 'File "<stdin>", line 11, in read' in attempt1.stderr
+    assert "AttributeError: 'ADC' object has no attribute 'read'" in attempt1.stderr
 
     attempt2 = await board.exec("driver attempt 2", timeout_s=5.0)
     assert attempt2.ok

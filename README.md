@@ -72,7 +72,15 @@ sequenceDiagram
 
 ## Quickstart
 
+Prerequisites: [uv](https://docs.astral.sh/uv/) and Node 20+. Docker only if
+you want Grafana/memory (`make infra-up`). No hardware and no API key needed
+for the full mock demo.
+
 ```bash
+# one-time setup
+cd backend && uv sync --group dev && cd ..
+cd frontend && npm install && cd ..
+
 # 0. nothing required: no hardware, no API key, no docker
 make test        # backend suite — green offline by design
 

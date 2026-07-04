@@ -24,7 +24,7 @@ async def test_attempts_differ_and_both_pass_the_gate(settings: Settings) -> Non
     spec = _spec(settings)
 
     first = await author(spec, 1, None)
-    second = await author(spec, 2, "ValueError: Pin GP15 does not have ADC capabilities")
+    second = await author(spec, 2, "AttributeError: 'ADC' object has no attribute 'read'")
 
     assert first.driver_code != second.driver_code
     for gen in (first, second):
@@ -33,17 +33,19 @@ async def test_attempts_differ_and_both_pass_the_gate(settings: Settings) -> Non
 
 
 async def test_story_beats(settings: Settings) -> None:
-    """Attempt 1 reads the WRONG (but ADC-capable) pin; attempt 2 reads the
-    spec's pin and its reasoning references the board's error."""
+    """Attempt 1 has the ESP32 habit (adc.read(), absent on RP2040); attempt 2
+    corrects to read_u16() and its reasoning references the board's error."""
     author = build_mock_author(settings)
     spec = _spec(settings)
 
     first = await author(spec, 1, None)
-    assert f"ADC({settings.pins_ldr})" not in first.driver_code  # wrong pin on purpose
+    assert "self.adc.read()" in first.driver_code  # the wrong-platform habit
+    assert "read_u16" not in first.driver_code
 
-    second = await author(spec, 2, "ValueError: Pin GP15 does not have ADC capabilities")
-    assert f"ADC({settings.pins_ldr})" in second.driver_code  # corrected
-    assert "traceback" in second.reasoning.lower() or "pin" in second.reasoning.lower()
+    second = await author(spec, 2, "AttributeError: 'ADC' object has no attribute 'read'")
+    assert "self.adc.read_u16()" in second.driver_code  # corrected method
+    assert f"ADC({settings.pins_ldr})" in second.driver_code
+    assert "read_u16" in second.reasoning or "attribute" in second.reasoning.lower()
 
 
 async def test_deterministic_replay(settings: Settings) -> None:

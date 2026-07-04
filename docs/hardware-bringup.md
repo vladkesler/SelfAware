@@ -92,8 +92,9 @@ The gate deliberately blocks the "spec a non-ADC pin" trick (it rejects
 `ADC(15)` before the board ever sees it). Deterministic first-failure options:
 
 1. **Offline / keyless**: `SELFAWARE_MOCK_BOARD=true SELFAWARE_MOCK_AUTHOR=true`
-   — the canned author + `demo_fail_then_pass_script()` replay a genuine-looking
-   `ValueError: Pin GP15 does not have ADC capabilities` then converge. Always
+   — the canned author calls ESP32's `adc.read()` and the scripted board replies
+   with the exact `AttributeError: 'ADC' object has no attribute 'read'` a real
+   RP2040 raises, then attempt 2 converges with `read_u16()`. Always
    works; this is the rehearsal and the fallback.
 2. **Real board**: prime the author prompt with the wrong-platform convention
    (ESP32-style `.atten()` steering with the gate's `.atten` check temporarily

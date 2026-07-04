@@ -51,8 +51,9 @@ def test_repair_prompt_embeds_verbatim_traceback() -> None:
     under the canonical 'the board replied:' header."""
     traceback = (
         "Traceback (most recent call last):\n"
-        '  File "<stdin>", line 4, in <module>\n'
-        "ValueError: Pin GP15 does not have ADC capabilities\n"
+        '  File "<stdin>", line 15, in <module>\n'
+        '  File "<stdin>", line 11, in read\n'
+        "AttributeError: 'ADC' object has no attribute 'read'\n"
     )
     attempt = AttemptContext(
         attempt_n=2,

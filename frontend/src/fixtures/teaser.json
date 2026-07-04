@@ -41,7 +41,7 @@
       "type": "agent.thought",
       "payload": {
         "agent": "driver_author",
-        "text": "Analog on GP27 \u2014 writing the driver."
+        "text": "Analog on GP27 — writing the driver."
       }
     }
   },
@@ -96,7 +96,7 @@
         "commission_id": "c-ldr-001",
         "attempt": 1,
         "stage": "test",
-        "traceback": "Traceback (most recent call last):\n  File \"<stdin>\", line 4, in <module>\nValueError: Pin GP15 does not have ADC capabilities"
+        "traceback": "Traceback (most recent call last):\n  File \"<stdin>\", line 15, in <module>\n  File \"<stdin>\", line 11, in read\nAttributeError: 'ADC' object has no attribute 'read'"
       }
     }
   },

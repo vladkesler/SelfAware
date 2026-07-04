@@ -184,8 +184,10 @@ def demo_fail_then_pass_script(slug: str = "ldr") -> list[ScriptedExchange]:
     """The rehearsable demo arc: gate-passing code, board-raised failure, recovery.
 
     Attempt 1: the exec'd driver passed the static gate, but the *board*
-    raises — a REALISTIC verbatim MicroPython traceback (the un-fakeable
-    signal the repair prompt embeds untouched). Attempt 2: a plausible,
+    raises — the exact AttributeError a real RP2040 gives when code calls
+    ESP32's adc.read() (the mock author's scripted habit; `read` is a legal
+    attribute name, so no static gate can catch it). Verbatim: the un-fakeable
+    signal the repair prompt embeds untouched. Attempt 2: a plausible,
     non-railed reading, so plausibility passes and the driver registers.
 
     Theatrical delay_s so the UI stepper animates believably.
@@ -196,8 +198,9 @@ def demo_fail_then_pass_script(slug: str = "ldr") -> list[ScriptedExchange]:
             stdout="",
             stderr=(
                 "Traceback (most recent call last):\n"
-                '  File "<stdin>", line 4, in <module>\n'
-                "ValueError: Pin GP15 does not have ADC capabilities\n"
+                '  File "<stdin>", line 15, in <module>\n'
+                '  File "<stdin>", line 11, in read\n'
+                "AttributeError: 'ADC' object has no attribute 'read'\n"
             ),
             delay_s=0.15,
         ),
