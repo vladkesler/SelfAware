@@ -44,13 +44,55 @@ last-resort fallback.
    the light level?" → PILOT calls `read_ldr` — a tool that did not exist five
    minutes ago — and reports the live value. Ask about a sensor that isn't
    commissioned: it says so instead of inventing a number.
-8. **The glass brain (Grafana).** Open the Commission Theater dashboard: the
+8. **An agent that isn't ours, over MCP.** Switch windows entirely to a stock
+   terminal and run `claude` from the repo root (Claude Code, connected via
+   the checked-in `.mcp.json` — see setup below). Say it out loud: *"this
+   terminal is not our app."* Ask "what hardware can you reach right now?" —
+   it calls `list_capabilities` and reports the board and the LDR. Ask
+   "what's the light level?" — it discovers `read_ldr` on its own (a tool
+   that did not exist five minutes ago) and reports the live value. Cover
+   the sensor, ask again, show the value change: liveness, but witnessed by
+   an agent that isn't SelfAware's own UI. Optionally: "is that sensor
+   healthy?" → `get_sensor_health` answers with the board's own named
+   reason. Narrate: *"MCP is the difference between 'our chatbot can read a
+   sensor' and 'any agent can gain a verified physical capability' — that's
+   the admission layer, not the transport layer."*
+9. **The glass brain (Grafana).** Open the Commission Theater dashboard: the
    trace waterfall of the exact commission the judges just watched —
    generate/validate/deploy/test spans, the failed attempt, token usage.
-9. **Close with the honesty floor.** Tractable: analog reads, self-identifying
-   bus devices, single-pulse timing. Hard: multi-register state machines,
-   bit-banged timing. Impossible: "auto-detect anything." Saying this is what
-   makes the rest believable.
+10. **Close with the honesty floor.** Tractable: analog reads, self-identifying
+    bus devices, single-pulse timing. Hard: multi-register state machines,
+    bit-banged timing. Impossible: "auto-detect anything." Saying this is what
+    makes the rest believable.
+
+## Setting up the MCP beat (do this before judges arrive, not during)
+
+1. Set `SELFAWARE_MCP_TOKEN` once in `.env` — the Makefile `-include`s and
+   exports `.env`, so both `make dev-backend` and `make dev-mcp` pick it up
+   from there; no shell exports needed.
+2. `make dev-backend` (or `make demo-mock` for the keyless path) in one
+   terminal, `make dev-mcp` in a second — two processes, on purpose (see
+   `docs/agents.md`: mounting MCP into the main app hits a documented SDK
+   bug). Start order doesn't matter: the MCP process holds no tool state,
+   so it just answers from the live registry once the backend is up.
+3. From the repo root, run `claude` — Claude Code picks up the checked-in
+   `.mcp.json` (HTTP transport → `http://127.0.0.1:8001/mcp`) and prompts
+   once to approve the project server. **Approve it during rehearsal, never
+   on stage.** From a terminal outside the repo:
+   `claude mcp add --transport http selfaware http://127.0.0.1:8001/mcp`.
+4. **Mid-session tool appearance — know the limitation instead of hoping:**
+   tools commissioned *before* the Claude Code session starts appear
+   automatically. A sensor commissioned *mid-session* will NOT push into an
+   open conversation — fastmcp (the server side) never emits
+   `tools/list_changed` from background changes; this is a server-library
+   limitation, not Claude Code's. Two rehearsed outs, decided in advance:
+   `/mcp` → reconnect selfaware (~2 s, always yields the fresh list), or the
+   always-present `read_sensor("<slug>")` gateway tool, which works with no
+   reconnect at all.
+5. Keep this beat sequenced, not interleaved with beat 4's `make demo-mock`
+   rehearsal: MockBoard's scripted fail→pass exchanges are consumed in
+   strict order, and a stray MCP-triggered read mid-rehearsal will desync
+   the script.
 
 ## Making the first failure deterministic (never hope for a hallucination)
 

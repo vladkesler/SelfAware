@@ -54,3 +54,16 @@ class DriverRecord(BaseModel):
         if self.protocol_class is ProtocolClass.OUTPUT:
             return [f"set_{self.slug}"]
         return [f"read_{self.slug}"]
+
+    # --- shared tool-description wording -------------------------------------
+    # Single source of truth for both the copilot's in-process toolset
+    # (registry/store.py::as_toolset) and the out-of-process MCP transport
+    # (mcp_server.py) — an external agent and the copilot should never see
+    # different descriptions for the same verified capability.
+
+    def read_description(self) -> str:
+        unit = f" (unit: {self.unit})" if self.unit else ""
+        return f"Take a live reading from {self.display_name}{unit} via its verified on-board driver."
+
+    def set_description(self) -> str:
+        return f"Set {self.display_name} to a level (0 = off) via its verified on-board driver."

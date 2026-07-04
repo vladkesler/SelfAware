@@ -9,7 +9,7 @@ COMPOSE := docker compose -f infra/docker-compose.yml
 -include .env
 export
 
-.PHONY: help infra-up infra-down dev-backend dev-frontend test typecheck demo-mock demo grafana
+.PHONY: help infra-up infra-down dev-backend dev-frontend dev-mcp test typecheck demo-mock demo grafana
 
 help: ## list targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -25,6 +25,9 @@ dev-backend: ## run FastAPI with reload on :8000 (auto-loads repo-root .env if p
 
 dev-frontend: ## run Vite dev server on :5173
 	cd frontend && npm run dev
+
+dev-mcp: ## run the standalone MCP transport on :8001 (needs SELFAWARE_MCP_TOKEN set on both processes)
+	cd backend && uv run python -m selfaware.mcp_server
 
 test: ## backend tests — green with no .env, no docker, no USB, no API key
 	cd backend && uv run pytest -q
