@@ -14,8 +14,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# root-anchored so frontend/src/lib is NOT ignored
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -216,3 +217,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- SelfAware ---
+node_modules/
+frontend/dist/
+data/
+*.db
+.DS_Store
