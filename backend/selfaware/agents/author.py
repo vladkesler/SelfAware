@@ -3,7 +3,8 @@
 No tools (the author never touches the board — host/LLM split, invariant #2),
 no message_history (repair context is rebuilt per attempt from AttemptContext,
 so every attempt is one small reproducible request). The agent is constructed
-WITHOUT a model; `resolve_model()` picks the string per run and raises a typed
+WITHOUT a model; `resolve_model()` picks the model per run (a provider:model
+string, or a Model instance for custom endpoints like Crusoe) and raises a typed
 ModelUnavailable when the provider key is absent — callers turn that into
 system.error{model_unavailable}, never a crash.
 
@@ -14,8 +15,13 @@ repair prompt can show it.
 """
 
 import os
+from functools import lru_cache
 
 from pydantic_ai import Agent, ModelSettings, UsageLimits
+from pydantic_ai.models import Model
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.profiles.openai import OpenAIModelProfile
+from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.usage import RunUsage
 
 from selfaware.agents.deps import AuthorDeps, render_board_profile
@@ -54,15 +60,40 @@ PROVIDER_KEY_ENV: dict[str, str] = {
     "deepseek": "DEEPSEEK_API_KEY",
     "openrouter": "OPENROUTER_API_KEY",
     "xai": "XAI_API_KEY",
+    "crusoe": "CRUSOE_API_KEY",  # OpenAI-compatible endpoint; see _crusoe_model()
 }
 
 
-def resolve_model(settings: Settings, override: str | None = None) -> str:
-    """The per-run model switch. Returns the pydantic-ai model string.
+@lru_cache(maxsize=8)
+def _crusoe_model(name: str, base_url: str, api_key: str) -> Model:
+    """Build (once, then cache) an OpenAI-compatible Model pointed at Crusoe.
+
+    Crusoe Cloud has no dedicated pydantic-ai prefix, but its inference API
+    speaks the Chat Completions wire format — so any model it hosts (e.g.
+    `moonshotai/Kimi-K2.6`) is an OpenAIChatModel behind an OpenAIProvider that
+    carries the base_url + key. lru_cache keys on (model, endpoint, key) so this
+    long-running server reuses ONE AsyncOpenAI client per distinct config
+    instead of leaking a socket pool on every commission attempt.
+
+    strict tool definitions are disabled: `strict` is OpenAI's own schema
+    extension and Crusoe-hosted open models don't honor it, while BOTH agents
+    here depend on tool-calling working — the author's structured DriverGenOutput
+    and the copilot's toolbelt.
+    """
+    return OpenAIChatModel(
+        name,
+        provider=OpenAIProvider(base_url=base_url, api_key=api_key),
+        profile=OpenAIModelProfile(openai_supports_strict_tool_definition=False),
+    )
+
+
+def resolve_model(settings: Settings, override: str | None = None) -> str | Model:
+    """The per-run model switch. Returns a pydantic-ai model string, or a Model
+    instance for providers (Crusoe) that need a custom endpoint.
 
     Raises ModelUnavailable when the 'provider:' prefix maps to a key env var
     that is not set. Called at RUN time only — importing agent modules never
-    reads credentials (invariant #7).
+    reads credentials nor builds a client (invariant #7).
     """
     model = override or settings.model
     prefix = model.split(":", 1)[0] if ":" in model else model
@@ -72,6 +103,9 @@ def resolve_model(settings: Settings, override: str | None = None) -> str:
             f"model {model!r} needs {key_var} which is not set — "
             "export it, pick another SELFAWARE_MODEL, or run with SELFAWARE_MOCK_AUTHOR=true"
         )
+    if prefix == "crusoe":
+        # key_var check above guarantees CRUSOE_API_KEY is present and non-empty.
+        return _crusoe_model(model.split(":", 1)[1], settings.crusoe_base_url, os.environ["CRUSOE_API_KEY"])
     return model
 
 

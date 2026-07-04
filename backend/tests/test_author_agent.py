@@ -80,3 +80,24 @@ def test_resolve_model_returns_string_with_key(monkeypatch: pytest.MonkeyPatch) 
     assert resolve_model(settings) == "anthropic:claude-sonnet-5"
     # the author override wins when present
     assert resolve_model(settings, "anthropic:claude-haiku-4-5") == "anthropic:claude-haiku-4-5"
+
+
+def test_resolve_model_crusoe_raises_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """crusoe: gates on CRUSOE_API_KEY like every other provider — no key, no client."""
+    monkeypatch.delenv("CRUSOE_API_KEY", raising=False)
+    settings = Settings(_env_file=None, model="crusoe:moonshotai/Kimi-K2.6")
+    with pytest.raises(ModelUnavailable, match="CRUSOE_API_KEY"):
+        resolve_model(settings)
+
+
+def test_resolve_model_crusoe_builds_openai_compatible_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With the key present, crusoe: yields an OpenAIChatModel carrying the full
+    `moonshotai/Kimi-K2.6` name and Crusoe's base_url — never a bare string."""
+    from pydantic_ai.models.openai import OpenAIChatModel
+
+    monkeypatch.setenv("CRUSOE_API_KEY", "test-key-not-real")
+    settings = Settings(_env_file=None, model="crusoe:moonshotai/Kimi-K2.6")
+    model = resolve_model(settings)
+    assert isinstance(model, OpenAIChatModel)
+    assert model.model_name == "moonshotai/Kimi-K2.6"  # colon in the model name is preserved
+    assert "api.inference.crusoecloud.com" in str(model.base_url)

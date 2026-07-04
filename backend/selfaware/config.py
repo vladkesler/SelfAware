@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     # --- model (ONE switch; provider-agnostic 'provider:model' string) -------
     model: str = "anthropic:claude-sonnet-5"
     author_model: str | None = None  # optional override for the driver author; falls back to `model`
+    # Crusoe is OpenAI-compatible but has no pydantic-ai prefix of its own, so we
+    # add a `crusoe:` one (see agents/author.py). Base URL lives here because it
+    # is a knob; the CRUSOE_API_KEY is a raw env var read at run time, like every
+    # other provider key (never a Settings field — provider SDKs want os.environ).
+    crusoe_base_url: str = "https://api.inference.crusoecloud.com/v1/"
 
     # --- explicit mocks (NEVER silent fallbacks) ------------------------------
     mock_board: bool = False  # True => MockBoard everywhere; board absent otherwise = honest disconnected
