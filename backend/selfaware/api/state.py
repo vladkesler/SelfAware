@@ -14,6 +14,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from selfaware.analytics.history import HistoryStore
 from selfaware.bringup.loop import AuthorFn, CommissionRunner
 from selfaware.bringup.service import CommissionService
 from selfaware.config import Settings
@@ -41,6 +42,7 @@ class AppState:
     transport: BoardTransport
     session: BoardSession
     registry: DriverRegistry
+    history: HistoryStore
     memory: "MemoryClient"
     runner: CommissionRunner
     commissioner: CommissionService

@@ -14,6 +14,7 @@ whole story. A real board that fails discovery stays HONESTLY disconnected;
 there is no silent fallback anywhere in this file.
 """
 
+import asyncio
 import contextlib
 from collections.abc import AsyncIterator
 
@@ -21,6 +22,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import selfaware
+from selfaware.analytics.history import HistoryStore
 from selfaware.api import handlers, rest, ws
 from selfaware.api.state import AppState
 from selfaware.bringup.loop import AuthorFn, CommissionRunner
@@ -96,6 +98,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         registry = DriverRegistry(bus)
         session.bind_registry(registry)
 
+        # 4b. reading history for analytics/health.py — one bus subscription,
+        # fed by the same sensor.reading events the poller already publishes
+        history = HistoryStore(bus)
+        history_task = asyncio.create_task(history.run())
+
         # 5. memory — one ping decides Http vs Null; nothing blocks on it later
         from selfaware.memory.client import HttpMemoryClient
 
@@ -136,6 +143,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             transport=transport,
             session=session,
             registry=registry,
+            history=history,
             memory=memory,
             runner=runner,
             commissioner=commissioner,
@@ -157,11 +165,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             yield
         finally:
-            # shutdown: reverse order, every step shielded
+            # shutdown: reverse order, every step shielded. session.close()
+            # (stops the poller) runs BEFORE history_task is torn down, so
+            # history stops listening only once its data source has actually
+            # stopped publishing, not before.
             with contextlib.suppress(Exception):
                 await watcher.stop()  # stop scanning before the wire closes
             with contextlib.suppress(Exception):
                 await session.close()  # stops the poller, closes the transport
+            history_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                # BOTH: CancelledError is a BaseException, not an Exception,
+                # since Python 3.8 — suppress(Exception) alone would NOT catch
+                # the cancellation this .cancel() just triggered. Also covers
+                # history.run() having already died from an earlier unhandled
+                # exception, so the remaining shutdown steps aren't skipped.
+                await history_task
             aclose = getattr(memory, "aclose", None)
             if aclose is not None:
                 with contextlib.suppress(Exception):
