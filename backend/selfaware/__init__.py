@@ -1,9 +1,10 @@
-"""SelfAware — Cursor for hardware.
+"""SelfAware — verified hands for AI agents in the physical world.
 
-Plug in a sensor, teach it once, and an AI agent writes the MicroPython
-driver, deploys it to a real Pico W over USB serial (raw REPL, no flash
-writes), test-reads it on real silicon, and self-repairs from the board's
-own verbatim traceback.
+Plug in a device nobody wrote a driver for, teach it once, and an AI agent
+writes the MicroPython driver, deploys it to a real Pico W over USB serial
+(raw REPL, no flash writes), test-reads it on real silicon, and self-repairs
+from the board's own verbatim traceback. Drivers that survive the loop are
+admitted to the registry and become live tools an agent copilot can call.
 
 Package map (see docs/architecture.md):
     events/        the typed language of the system (WS envelopes, bus, commands)

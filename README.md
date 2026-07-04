@@ -1,13 +1,43 @@
 # SelfAware
 
-**Cursor for hardware.** Plug in a sensor, teach it once — an AI agent writes
-the MicroPython driver, deploys it to a real Raspberry Pi Pico W over USB
-serial, test-reads it on real silicon, and **repairs itself from the board's
-own traceback** when something goes wrong.
+**Verified hands for AI agents in the physical world.** Plug in a device
+nobody wrote a driver for — an AI agent writes the MicroPython driver,
+deploys it to a real Raspberry Pi Pico W over USB serial, test-reads it on
+real silicon, and **repairs itself from the board's own traceback**. Only
+when the hardware itself vouches for the result is the driver admitted to
+the registry — where it instantly becomes a live tool (`read_ldr`,
+`set_relay`) that an agent copilot can call.
 
 > Reliability is a property of the **loop**, not the model. Every attempt is
 > judged by physical hardware; a traceback from the chip cannot be
 > hallucinated, and it steers the next fix.
+
+## The missing layer: agents got tools, hardware got left behind
+
+MCP made "agents calling tools" the default way software gets used, and it is
+already reaching devices — MCP-to-microcontroller bridges exist today. But
+every one of them shares the same hidden assumption: **a human already wrote
+and vouched for the driver.** The agent only gets to call adapters a firmware
+engineer hand-built, one device at a time. That's a *transport* layer.
+
+What's missing is the **admission layer**: how does a device the system has
+*never seen* become callable — and trustworthy — without a human writing
+code? SelfAware is that layer. Trust isn't inherited from a human author; it
+is **manufactured by the loop**:
+
+1. The agent writes the driver — and is never trusted by default.
+2. A host-owned AST safety gate constrains what the code may do before it
+   ever touches a pin.
+3. Real silicon executes it; the verbatim traceback steers each repair.
+4. Physics-based lie detection (railed/floating pin fingerprints, plausible
+   range, liveness — the value must *move* when you cover the LDR) rejects
+   numbers that merely look right.
+5. Only then is the driver admitted to the registry and exposed as a live,
+   hot-swappable agent tool.
+
+The human's role shrinks to the one thing only a human can know — "this wire
+is an LDR on GP27" — stated once. Everything after that is the loop's
+problem. Others distribute trust; SelfAware manufactures it.
 
 ## Architecture
 
@@ -39,7 +69,7 @@ flowchart LR
     MEMC -->|"REST :8100"| MEM["agent-memory-server<br/>+ redis"]
 ```
 
-## The self-repair loop
+## The self-repair loop — where trust is manufactured
 
 ```mermaid
 sequenceDiagram
@@ -99,13 +129,29 @@ make infra-up    # docker compose: grafana/otel-lgtm (Grafana :3000, OTLP
 make infra-down  # stop the stack (add -v in infra/ to also drop redis data)
 
 # 3. real everything (each switch independent — see degradation matrix)
-cp .env.example .env             # add ANTHROPIC_API_KEY for the real author
+cp .env.example .env             # pick a model + set its key (see "Model provider")
 make dev-backend                 # plug in the Pico W first; port auto-discovered
 make dev-frontend
 ```
 
 The backend never *requires* the containers: if the stack is down, traces are
 dropped silently and memory degrades to a no-op client.
+
+### Model provider
+
+`SELFAWARE_MODEL` is the one switch — any PydanticAI `provider:model` string,
+with the matching key in `.env`. Anthropic is the default; **Crusoe** (an
+OpenAI-compatible inference endpoint) is wired in under a `crusoe:` prefix:
+
+```bash
+SELFAWARE_MODEL=crusoe:moonshotai/Kimi-K2.6
+CRUSOE_API_KEY=your-crusoe-key
+# SELFAWARE_CRUSOE_BASE_URL=https://api.inference.crusoecloud.com/v1/   # override for a proxy/region
+```
+
+Scope Crusoe to just the driver author with `SELFAWARE_AUTHOR_MODEL=crusoe:…`
+and leave the copilot on another provider. A missing key fails fast with a
+clean `model_unavailable` error — never mid-commission.
 
 | | |
 |---|---|

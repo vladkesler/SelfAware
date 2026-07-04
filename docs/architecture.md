@@ -5,9 +5,13 @@ Browser (React) ──WebSocket──► FastAPI backend ──USB serial──�
  "agent theater"    (network)   raw-REPL bridge   (electrical)
 ```
 
-SelfAware is "Cursor for hardware": plug in a sensor, teach it once, and an AI
-agent writes the MicroPython driver, deploys it over USB serial, test-reads it
-on real silicon, and self-repairs from the board's own traceback.
+SelfAware is the admission layer between AI agents and physical hardware:
+plug in a device nobody wrote a driver for, teach it once, and an AI agent
+writes the MicroPython driver, deploys it over USB serial, test-reads it on
+real silicon, and self-repairs from the board's own traceback. A driver that
+survives the loop is admitted to the registry and becomes a live tool an
+agent can call — trust is manufactured by the loop, not inherited from a
+human author.
 
 ## The one loop everything serves
 
