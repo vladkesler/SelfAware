@@ -5,13 +5,14 @@
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Landing from './routes/Landing';
 import Console from './routes/Console';
 import '@fontsource-variable/jetbrains-mono';
 import '@fontsource-variable/inter';
 import './styles/tokens.css';
 import './styles/base.css';
+import './styles/landing.css';
 import './styles/console.css';
 import './styles/theater.css';
 
@@ -21,6 +22,9 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/app" element={<Console />} />
+        <Route path="/about" element={<Navigate to="/#about" replace />} />
+        <Route path="/team" element={<Navigate to="/#team" replace />} />
+        <Route path="/industry" element={<Navigate to="/#industry" replace />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,

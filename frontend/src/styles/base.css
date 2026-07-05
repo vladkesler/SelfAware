@@ -1,7 +1,7 @@
 /**
- * Base — reset + shared primitives (panel chrome, LEDs, buttons, inputs)
- * + the landing void. Console layout lives in console.css; the commission
- * theater lives in theater.css. Everything binds to tokens.css.
+ * Base — reset + shared primitives (panel chrome, LEDs, buttons, inputs).
+ * The landing site lives in landing.css; console layout in console.css; the
+ * commission theater in theater.css. Everything binds to tokens.css.
  */
 
 /* ---- reset ---------------------------------------------------------- */
@@ -225,76 +225,12 @@ a {
   color: var(--text-faint);
 }
 
-/* ---- landing (the void) ---------------------------------------------- */
-
-.landing {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: calc(var(--unit) * 10);
-  /* a faint ion pool under the pitch so the void reads powered, not dead */
-  background:
-    radial-gradient(50% 45% at 50% 42%, var(--ion-tint), transparent 75%),
-    var(--bg-void);
-  padding: calc(var(--unit) * 6);
-}
-.landing__pitch {
-  font-family: var(--font-voice);
-  font-size: clamp(1.4rem, 3.2vw, 2.4rem);
-  font-weight: 300;
-  letter-spacing: 0.01em;
-  text-align: center;
-  text-wrap: balance;
-  max-width: 22ch;
-}
-.teaser {
-  width: min(560px, 90vw);
-  min-height: 190px;
-  background: var(--bg-panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: calc(var(--unit) * 4);
-  font-size: var(--fs-meta);
-  color: var(--ion);
-  box-shadow: 0 0 40px var(--ion-tint);
-}
-.teaser__line {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.teaser__line--alert {
-  color: var(--alert);
-}
-.teaser__cursor {
-  animation: heartbeat 1.1s steps(2, start) infinite;
-}
-.landing__cta {
-  font-size: var(--fs-body);
-  color: var(--ion);
-  text-decoration: none;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: calc(var(--unit) * 2) calc(var(--unit) * 4);
-  background: var(--bg-panel);
-}
-.landing__cta:hover {
-  border-color: var(--ion-dim);
-  text-shadow: 0 0 8px var(--ion-glow);
-}
-.landing__cursor {
-  animation: heartbeat 1.1s steps(2, start) infinite;
-}
-
 /* ---- reduced motion --------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
   .dot--live,
   .dot--busy,
-  .term__cursor,
-  .teaser__cursor,
-  .landing__cursor {
+  .term__cursor {
     animation: none;
   }
   .panel,

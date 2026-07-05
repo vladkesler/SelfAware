@@ -79,6 +79,11 @@
   --act-ms: 420ms; /* act enter / attempt collapse / stage cross-fade */
   --stamp-ms: 640ms; /* the admission thunk */
   --flow-s: 1.6s; /* dash-march period on live traces */
+  --reveal-ms: 600ms; /* page-level scroll reveals (landing sections) */
   --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* landing chrome */
+  --navbar-h: 64px;
+  --bg-void-translucent: rgb(15 18 22 / 0.72); /* --bg-void at 72% for the frosted navbar */
 }
