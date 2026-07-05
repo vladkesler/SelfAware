@@ -27,6 +27,9 @@ export function Navbar() {
         <a className="navbar__link" href="#team">
           Team
         </a>
+        <a className="navbar__link" href="/scalability.html" target="_blank" rel="noreferrer">
+          Scalability
+        </a>
         <Link className="navbar__link" to={{ pathname: '/app', search: location.search }}>
           Start Now
         </Link>
