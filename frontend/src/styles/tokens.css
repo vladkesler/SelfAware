@@ -28,8 +28,12 @@
   /* motion — events arrive as pulses; stages ignite; only the scope idles */
   --pulse-ms: 180ms; /* arrival flash on panel chrome */
   --stage-ms: 320ms; /* stepper stage transitions */
+  --reveal-ms: 600ms; /* page-level scroll reveals (why-section, footer) */
   --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
 
   --unit: 4px;
   --radius: 4px; /* tight radii; instruments, not bubbles */
+
+  --navbar-h: 64px;
+  --bg-void-translucent: rgb(10 11 13 / 0.72);
 }
