@@ -39,6 +39,9 @@ class EventType(StrEnum):
     SENSOR_READING = "sensor.reading"
     ACTUATOR_STATE = "actuator.state"
 
+    # sensor.health — derived health verdict + degradation trend (analytics/)
+    SENSOR_HEALTH = "sensor.health"
+
     # discovery.* — plug-and-detect (I2C identity; ADC presence-only)
     DISCOVERY_DEVICE_FOUND = "discovery.device_found"
     DISCOVERY_DEVICE_LOST = "discovery.device_lost"

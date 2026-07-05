@@ -66,6 +66,7 @@ never kills the socket.
 | `agent.tool_result` | `{agent, tool, tool_call_id, ok, preview}` | preview truncated ~500 chars |
 | `agent.message` | `{agent, delta, done, usage?}` | streamed chat; client accumulates deltas |
 | `sensor.reading` | `{slug, value, unit, plausible}` | `plausible` is the HOST's verdict |
+| `sensor.health` | `{slug, status, reasons, readings_count, baseline_target, trend: {direction, eta_s?, note?}}` | derived verdict (`analytics/`); `status ∈ healthy\|degrading\|critical\|unknown\|not_monitored`; pushed only on a coarse-verdict change + replayed on connect; every non-healthy status carries a NAMED reason, never a bare score |
 | `actuator.state` | `{slug, level, ok}` | feedback for `cmd.set` |
 | `discovery.device_found` | `{bus, addr?, pin?, identity?, confidence, suggested_spec?}` | `bus ∈ i2c\|adc`; `confidence ∈ exact\|unknown` — see honesty note below |
 | `discovery.device_lost` | `{bus, addr?, pin?}` | |

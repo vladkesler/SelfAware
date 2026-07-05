@@ -27,14 +27,27 @@ last-resort fallback.
 5. **Liveness, not vibes.** Cover the LDR / wave at the ultrasonic — the scope
    moves. (Mock: `cmd.stimulate`.) *"A plausible number is not a live sensor;
    movement under stimulus is."*
-6. **Capability accretion.** In the AGENT column (now the PILOT console): "what's
+6. **Sensor health, not just a reading (the derived layer).** The SIGNAL card
+   carries a health chip beside the reading: after ~10 readings it leaves
+   `BASELINE n/10` for `HEALTHY`. Now cover a temp sensor and HOLD (mock:
+   `cmd.stimulate` a sustained `+delta` on `shtc3`) — the temperature climbs and
+   settles at a new level, and the chip flips to `DEGRADING`/`CRITICAL` with a
+   **named** reason in the card foot (*"readings have risen 8.2 (3.6σ) from the
+   baseline and are holding there — the value is running away from where it
+   settled"*), not a bare score; uncover it and it recovers. Actuators read
+   `ACTUATOR`, never a forever-`unknown`. Narrate: *"a live reading proves it's
+   wired; the health chip proves we noticed when reality changed — and can say
+   WHY, in the board's own terms."* (Wire: the `sensor.health` event, pushed on
+   change + replayed on connect. Math: `analytics/health.py` — staleness,
+   railing, variance, and baseline drift, each an honestly uncalibrated signal.)
+7. **Capability accretion.** In the AGENT column (now the PILOT console): "what's
    the light level?" → PILOT calls `read_ldr` — a tool that did not exist five
    minutes ago — and reports the live value. Ask about a sensor that isn't
    commissioned: it says so instead of inventing a number.
-7. **The glass brain (Grafana).** Open the Commission Theater dashboard: the
+8. **The glass brain (Grafana).** Open the Commission Theater dashboard: the
    trace waterfall of the exact commission the judges just watched —
    generate/validate/deploy/test spans, the failed attempt, token usage.
-8. **Close with the honesty floor.** Tractable: analog reads, self-identifying
+9. **Close with the honesty floor.** Tractable: analog reads, self-identifying
    bus devices, single-pulse timing. Hard: multi-register state machines,
    bit-banged timing. Impossible: "auto-detect anything." Saying this is what
    makes the rest believable.
@@ -81,6 +94,11 @@ last-resort fallback.
   Run backend and frontend in separate terminals so this takes ~5 s.
 - Demo snappiness on real hardware: `SELFAWARE_POLLER_INTERVAL_S=0.25` makes
   the cover-the-LDR scope dive read instantly at distance.
+- **Health needs real readings** (nothing here is faked, so nothing is instant):
+  the chip sits at `BASELINE n/10` until ~10 readings accumulate (~10 s at the
+  1 s poll), then reads `HEALTHY`; drift/variance need ~20. Let a sensor settle
+  before you cover it, or the beat reads backwards. `SELFAWARE_HEALTH_INTERVAL_S`
+  (default 4) sets how often the verdict re-scores.
 
 ## Failure ladder (when hardware misbehaves under fluorescent lights)
 

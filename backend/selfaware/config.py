@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     connect_timeout_s: float = 5.0
     poller_interval_s: float = 1.0
     discovery_interval_s: float = 4.0  # I2C bus re-scan cadence (hotplug -> device_found)
+    health_interval_s: float = 4.0  # sensor.health re-score cadence (analytics/watcher.py)
 
     # --- bringup loop ----------------------------------------------------------
     max_attempts: int = 4  # bounded; then honest FAILED + soft reset

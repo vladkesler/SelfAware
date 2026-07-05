@@ -36,6 +36,17 @@ export interface ReadingPoint {
   plausible: boolean;
 }
 
+export type HealthStatus = 'healthy' | 'degrading' | 'critical' | 'unknown' | 'not_monitored';
+
+/** Accumulated form of sensor.health — the latest verdict per slug. */
+export interface SensorHealthState {
+  status: HealthStatus;
+  reasons: string[];
+  readingsCount: number;
+  baselineTarget: number;
+  trend: { direction: string; etaS: number | null; note: string | null };
+}
+
 export interface StageRecord {
   stage: Stage;
   status: StageStatus;

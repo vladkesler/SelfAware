@@ -158,6 +158,27 @@ a {
   }
 }
 
+/* HealthChip — instrument LED + tracked-caps word. The dot carries the color;
+   the label lights ONLY for the two attention states, so green stays scarce. */
+.health-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--unit) * 1.5);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.health-chip__label {
+  line-height: 1;
+}
+.health-chip[data-status='degrading'] .health-chip__label {
+  color: var(--charge);
+}
+.health-chip[data-status='critical'] .health-chip__label {
+  color: var(--alert);
+}
+
 .btn {
   background: var(--bg-raised);
   border: 1px solid var(--line);

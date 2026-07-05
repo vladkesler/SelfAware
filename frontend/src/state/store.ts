@@ -17,6 +17,7 @@ import { type CommissionSlice, initialCommission } from './slices/commission';
 import { type FeedSlice, initialFeed } from './slices/feed';
 import { type DriversSlice, initialDrivers } from './slices/drivers';
 import { type ReadingsSlice, initialReadings } from './slices/readings';
+import { type HealthSlice, initialHealth } from './slices/health';
 import { type ChatSlice, initialChat } from './slices/chat';
 
 export interface StoreState {
@@ -26,6 +27,7 @@ export interface StoreState {
   feed: FeedSlice;
   drivers: DriversSlice;
   readings: ReadingsSlice;
+  health: HealthSlice;
   chat: ChatSlice;
 
   /** THE event entry point — the transport sink. Delegates to dispatch.ts. */
@@ -50,6 +52,7 @@ export const useStore = create<StoreState>()((set, get) => ({
   feed: initialFeed(),
   drivers: initialDrivers(),
   readings: initialReadings(),
+  health: initialHealth(),
   chat: initialChat(),
 
   apply: (ev) => applyEvent(ev, set, get),

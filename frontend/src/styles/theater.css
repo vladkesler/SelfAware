@@ -528,6 +528,13 @@
   border-radius: var(--radius);
   overflow: hidden;
 }
+/* Per-channel vitals, top-left over the trace — one chip per live sensor. */
+.scope-grid__tile .health-chip {
+  position: absolute;
+  top: calc(var(--unit) * 2);
+  left: calc(var(--unit) * 3);
+  z-index: 1;
+}
 .scope-grid__tile .scope {
   height: 100%;
 }

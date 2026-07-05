@@ -394,6 +394,25 @@ export function applyEvent(ev: AnyEvent, set: StoreSet, get: StoreGet): void {
       break;
     }
 
+    case 'sensor.health': {
+      const p = ev.payload;
+      set((s) => ({
+        health: {
+          bySlug: {
+            ...s.health.bySlug,
+            [p.slug]: {
+              status: p.status,
+              reasons: p.reasons,
+              readingsCount: p.readings_count,
+              baselineTarget: p.baseline_target,
+              trend: { direction: p.trend.direction, etaS: p.trend.eta_s, note: p.trend.note },
+            },
+          },
+        },
+      }));
+      break;
+    }
+
     case 'actuator.state': {
       const p = ev.payload;
       set((s) => {

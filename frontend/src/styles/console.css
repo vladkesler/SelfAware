@@ -486,6 +486,11 @@
   letter-spacing: 0.18em;
   color: var(--text-dim);
 }
+.hero__signal-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--unit) * 3);
+}
 .hero__signal-board {
   font-size: var(--fs-micro);
   letter-spacing: 0.1em;
@@ -516,6 +521,14 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* When health has something to say, the named reason speaks in its own tone —
+   the honest signal (variance / drift / rail) instead of a bare part name. */
+.hero__signal-foot[data-status='degrading'] {
+  color: var(--charge);
+}
+.hero__signal-foot[data-status='critical'] {
+  color: var(--alert);
 }
 
 /* ---- the AGENT column: PILOT console ------------------------------------ */

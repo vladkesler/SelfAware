@@ -15,6 +15,7 @@ export const useBoard = () => useStore((s) => s.board);
 export const useCommission = () => useStore((s) => s.commission);
 export const useDrivers = () => useStore((s) => s.drivers);
 export const useReadingsMeta = () => useStore((s) => s.readings);
+export const useHealth = () => useStore((s) => s.health);
 export const useChat = () => useStore((s) => s.chat);
 export const useFeed = () => useStore((s) => s.feed);
 

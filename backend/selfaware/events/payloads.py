@@ -180,6 +180,28 @@ class ActuatorStatePayload(BaseModel):
     ok: bool
 
 
+class HealthTrend(BaseModel):
+    """Short-horizon degradation projection (see analytics/health.py)."""
+
+    direction: str  # "stable" | "degrading" | "critical" | "insufficient_data"
+    eta_s: float | None = None  # seconds to critical, only while worsening
+    note: str | None = None
+
+
+class SensorHealthPayload(BaseModel):
+    """Derived health verdict for one driver — pushed on change + replayed on
+    connect (like discovery presences). Computed from real accumulated readings
+    only; "unknown"/"insufficient_data" are honest answers, never errors, and
+    every non-healthy status ships a NAMED reason, never a bare score."""
+
+    slug: str
+    status: str  # "healthy" | "degrading" | "critical" | "unknown" | "not_monitored"
+    reasons: list[str]
+    readings_count: int
+    baseline_target: int
+    trend: HealthTrend
+
+
 # --- discovery.* ---------------------------------------------------------------
 
 

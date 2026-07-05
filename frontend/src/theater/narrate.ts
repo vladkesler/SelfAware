@@ -177,6 +177,16 @@ export function narrate(ev: ServerEvent): Narration | null {
         text: `${p.slug} → ${p.value}${p.unit ? ` ${p.unit}` : ''}${p.plausible ? '' : ' ⚠ implausible'}`,
       };
     }
+    case 'sensor.health': {
+      const p = ev.payload;
+      // actuators (not_monitored) and calibration ticks (unknown) aren't log
+      // events — only a real verdict transition earns a serial line.
+      if (p.status === 'not_monitored' || p.status === 'unknown') return null;
+      const tone: LogTone =
+        p.status === 'critical' ? 'alert' : p.status === 'degrading' ? 'charge' : 'live';
+      const reason = p.reasons[0] ? ` · ${trunc(p.reasons[0], 80)}` : '';
+      return { tone, text: `${p.slug} health → ${p.status}${reason}` };
+    }
     case 'actuator.state': {
       const p = ev.payload;
       return {

@@ -171,6 +171,20 @@ export interface ActuatorState {
   ok: boolean;
 }
 
+export interface HealthTrendWire {
+  direction: string; // "stable" | "degrading" | "critical" | "insufficient_data"
+  eta_s: number | null; // seconds to critical, only while worsening
+  note: string | null;
+}
+export interface SensorHealth {
+  slug: string;
+  status: 'healthy' | 'degrading' | 'critical' | 'unknown' | 'not_monitored';
+  reasons: string[]; // named, never a bare score
+  readings_count: number;
+  baseline_target: number;
+  trend: HealthTrendWire;
+}
+
 export interface DeviceFound {
   bus: 'i2c' | 'adc';
   addr?: number | null;
@@ -225,6 +239,7 @@ export type ServerEvent =
   | Env<'agent.tool_result', AgentToolResult>
   | Env<'agent.message', AgentMessage>
   | Env<'sensor.reading', SensorReading>
+  | Env<'sensor.health', SensorHealth>
   | Env<'actuator.state', ActuatorState>
   | Env<'discovery.device_found', DeviceFound>
   | Env<'discovery.device_lost', DeviceLost>
@@ -253,6 +268,7 @@ export const KNOWN_EVENT_TYPES: readonly EventType[] = [
   'agent.tool_result',
   'agent.message',
   'sensor.reading',
+  'sensor.health',
   'actuator.state',
   'discovery.device_found',
   'discovery.device_lost',

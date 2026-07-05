@@ -81,6 +81,20 @@ async def ws_endpoint(websocket: WebSocket) -> None:
                     payload=presence.model_dump(mode="json"),
                 )
                 await websocket.send_text(event.model_dump_json())
+        # Rehydrate health verdicts the same way: the HealthWatcher only pushes
+        # sensor.health on change, so a fresh client would otherwise see nothing
+        # until the next transition. Replay every driver's current verdict here.
+        health_watcher = state.extras.get("health_watcher")
+        if health_watcher is not None:
+            now = datetime.now(UTC)
+            for verdict in health_watcher.current_health():
+                event = Event(
+                    type=EventType.SENSOR_HEALTH,
+                    ts=now,
+                    seq=0,
+                    payload=verdict.model_dump(mode="json"),
+                )
+                await websocket.send_text(event.model_dump_json())
         sender = asyncio.create_task(_send_loop(websocket, sub), name=f"ws-send-{conn_id[:8]}")
 
         while True:
