@@ -57,6 +57,15 @@ def test_analog_out_of_window_fails() -> None:
     assert "expected_max" in (verdict.reason or "")
 
 
+def test_analog_rail_fingerprint_scales_to_percent_window() -> None:
+    """A normalized 0..100 '%' sensor (unit='%') still trips the rails: 55 passes,
+    a near-zero 0.5 rails low, and a near-full 99.7 rails high."""
+    pct = dict(expected_min=0, expected_max=100, unit="%")
+    assert check(_analog_spec(**pct), "55").passed
+    assert "railed low" in (check(_analog_spec(**pct), "0.5").reason or "")
+    assert "railed high" in (check(_analog_spec(**pct), "99.7").reason or "")
+
+
 def test_unparseable_reading_fails_honestly() -> None:
     verdict = check(_analog_spec(), "<Driver object at 0x2000a1b0>")
     assert not verdict.passed

@@ -52,10 +52,13 @@ async def _build_transport(settings: Settings) -> BoardTransport:
         # runs ~9s — narratable, instead of flashing past in under a second.
         script = demo_fail_then_pass_script(delay_s=settings.mock_pace_s * 2)
         for exchange in script:
-            # Pin the demo beats to the commission's harness execs (the only
-            # pre-registration code containing the host-authored read call), so
-            # a board_scan or stray exec before the commission cannot eat them.
-            exchange.match = r"Driver\(\)\.read\(\)"
+            # Pin the demo beats to the LDR commission specifically — its read
+            # payload is the only pre-registration code containing `ADC(27)`.
+            # Scoping to LDR (not any `Driver().read()`) means the flagship arc
+            # plays for the LDR beat while every OTHER sensor commissions cleanly
+            # on attempt 1 via its own simulator, instead of being hijacked by
+            # the canned ADC traceback + a reading outside its plausibility window.
+            exchange.match = r"ADC\(\s*27\s*\)"
         # The known onboard I2C bricks (0x3C OLED, 0x70 SHTC3) answer EVERY
         # scan via the persistent responder — never queued, never exhausted —
         # so discovery cards appear on the first watcher tick, before any

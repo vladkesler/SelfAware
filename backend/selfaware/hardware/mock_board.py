@@ -133,6 +133,15 @@ class MockBoard:
                 duration_s=time.monotonic() - started,
             )
 
+        # Host OUTPUT harness (build_output_payload, soft-verify): the actuator
+        # drivers (servo/buzzer/fan) write to the motor co-processor or a PWM pin
+        # and print nothing a regex sim can key on — but the host wraps them as
+        # `_act = Driver(); _act.set(1); ... print(0)`, so answer that marker with
+        # the print(0) sentinel and OUTPUT soft-verify passes. `_Verify` is the
+        # cross-modal (build-day) payload shape, which prints sample LISTS instead.
+        if "_act = Driver()" in code and "_Verify" not in code:
+            return ExecResult(stdout="0\n", stderr="", duration_s=time.monotonic() - started)
+
         for sim in self._sims:
             if sim.pattern.search(code):
                 value = sim.value()
@@ -189,17 +198,29 @@ def _default_simulators() -> list[SimulatedSensor]:
     """Generators keyed by regex over exec'd driver code.
 
     Patterns target what generated MicroPython actually contains: 'ADC(27)'
-    for the LDR, 'ADC(26)' for the pot, the SHTC3 address for the temp brick.
+    for the LDR, 'ADC(26)' for the pot, the SHTC3 address for the temp brick,
+    'time_pulse_us' for the HC-SR04. A sim SHORT-CIRCUITS the driver (it answers
+    the whole exec), so it must emit the sensor's FINAL reading in its display
+    unit — the LDR/pot bases are percentages (unit '%'), not raw u16 counts,
+    because their drivers normalize the ADC read to 0..100.
     """
     return [
-        SimulatedSensor(slug="ldr", pattern=re.compile(r"ADC\(\s*27\s*\)"), base=30000.0),
-        SimulatedSensor(slug="pot", pattern=re.compile(r"ADC\(\s*26\s*\)"), base=45000.0),
+        SimulatedSensor(slug="ldr", pattern=re.compile(r"ADC\(\s*27\s*\)"), base=55.0, amplitude=25.0, noise=2.0),
+        SimulatedSensor(slug="pot", pattern=re.compile(r"ADC\(\s*26\s*\)"), base=50.0, amplitude=35.0, period_s=9.0, noise=2.0),
         SimulatedSensor(
             slug="shtc3",
             pattern=re.compile(r"0x70|(?<!\d)112(?!\d)"),
             base=22.5,
             amplitude=1.5,
             noise=0.1,
+        ),
+        SimulatedSensor(
+            slug="ultrasonic",
+            pattern=re.compile(r"time_pulse_us"),
+            base=30.0,
+            amplitude=18.0,
+            period_s=6.0,
+            noise=1.5,  # ~12–48 cm: inside the 2..400 window, never a negative timeout sentinel
         ),
     ]
 
@@ -231,7 +252,7 @@ def demo_fail_then_pass_script(slug: str = "ldr", delay_s: float = 0.15) -> list
         ),
         ScriptedExchange(
             match=None,
-            stdout="41250\n",
+            stdout="58.5\n",  # a plausible LDR reading in its '%' unit (0..100 window), not railed
             delay_s=delay_s,
         ),
     ]

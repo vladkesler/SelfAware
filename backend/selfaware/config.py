@@ -109,9 +109,13 @@ class Settings(BaseSettings):
                 protocol_class=ProtocolClass.ANALOG,
                 pins={"adc": self.pins_ldr},
                 expected_min=0,
-                expected_max=65535,
-                unit="raw",
+                expected_max=100,
+                unit="%",
                 stimulus_hint="cover the sensor with your hand",
+                extra_context=(
+                    "Report brightness as a percentage 0..100 of full scale: take the "
+                    "averaged raw u16 and return round(raw * 100 / 65535, 1)."
+                ),
             ),
             BringupSpec(
                 slug="pot",
@@ -119,9 +123,13 @@ class Settings(BaseSettings):
                 protocol_class=ProtocolClass.ANALOG,
                 pins={"adc": self.pins_pot},
                 expected_min=0,
-                expected_max=65535,
-                unit="raw",
+                expected_max=100,
+                unit="%",
                 stimulus_hint="turn the knob",
+                extra_context=(
+                    "Report the knob position as a percentage 0..100 of full scale: take "
+                    "the averaged raw u16 and return round(raw * 100 / 65535, 1)."
+                ),
             ),
             BringupSpec(
                 slug="shtc3",

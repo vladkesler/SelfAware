@@ -12,11 +12,14 @@ from pydantic import BaseModel
 
 from selfaware.bringup.models import BringupSpec, ProtocolClass
 
-# ADC rail fingerprint margin (u16 counts). A healthy analog source idles away
-# from the rails; a flat value within this margin of 0/65535 is the classic
-# "right module, wrong pin" signature (digital/ground-ish pin of the module).
-RAIL_MARGIN = 600
-U16_MAX = 65535
+# ADC rail fingerprint margin, as a FRACTION of the spec's expected window. A
+# healthy analog source idles away from the rails; a flat value within this
+# fraction of either end is the classic "right module, wrong pin" signature
+# (digital/ground-ish pin of the module). Expressing it as a fraction (not a
+# raw-u16 constant) keeps the fingerprint correct whatever unit the driver
+# reports — 0.01 of a 0..65535 window is ~655 counts (the old ~600), and 0.01 of
+# a 0..100 '%' window is 1.0, so a normalized sensor still trips the rails.
+RAIL_FRACTION = 0.01
 
 # Cross-modal gate margins: the quietest driven sample must clear the loudest
 # ambient one by BOTH a ratio AND an absolute raw margin — scale-invariant, so
@@ -65,17 +68,31 @@ def _range_check(value: float, spec: BringupSpec) -> Verdict | None:
 def analog_plausible(value: float, spec: BringupSpec) -> Verdict:
     """In-window AND not parked on a rail.
 
-    Rail check runs even when the spec window spans the full u16 range —
-    that is the whole point: 0..65535 'in range' would otherwise bless the
-    wrong-pin signature.
+    Rail check runs even when the spec window spans the sensor's full range —
+    that is the whole point: a value 'in range' at either extreme would
+    otherwise bless the wrong-pin signature. The margin is a fraction of the
+    expected window (RAIL_FRACTION), so this holds whether the driver reports
+    raw u16 counts or a normalized unit like '%'.
     """
-    if value <= RAIL_MARGIN:
-        return Verdict(passed=False, value=value, reason=f"value {value:g} railed low (~0): wrong-pin/ground signature")
-    if value >= U16_MAX - RAIL_MARGIN:
-        return Verdict(
-            passed=False, value=value, reason=f"value {value:g} railed high (~65535): wrong-pin/digital signature"
-        )
-    return _range_check(value, spec) or Verdict(passed=True, value=value)
+    # Range window first: a value OUTSIDE the window gets the honest range reason
+    # (not misreported as a rail). The rail fingerprint then applies only to
+    # IN-window values sitting at the sensor's physical extreme — which, for a
+    # full-scale analog window (0..full, as ldr/pot use), is the wrong-pin tell.
+    range_verdict = _range_check(value, spec)
+    if range_verdict is not None:
+        return range_verdict
+    lo, hi = spec.expected_min, spec.expected_max
+    if lo is not None and hi is not None:
+        margin = (hi - lo) * RAIL_FRACTION
+        if value <= lo + margin:
+            return Verdict(
+                passed=False, value=value, reason=f"value {value:g} railed low (~{lo:g}): wrong-pin/ground signature"
+            )
+        if value >= hi - margin:
+            return Verdict(
+                passed=False, value=value, reason=f"value {value:g} railed high (~{hi:g}): wrong-pin/digital signature"
+            )
+    return Verdict(passed=True, value=value)
 
 
 def bus_plausible(value: float, spec: BringupSpec) -> Verdict:
