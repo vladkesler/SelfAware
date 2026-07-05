@@ -170,6 +170,31 @@ clean `model_unavailable` error — never mid-commission.
 | Dashboard | http://localhost:5173/app |
 | Backend health | http://localhost:8000/healthz |
 | Grafana (agent traces) | http://localhost:3000 → *SelfAware · Commission Theater* |
+| MCP (external agents) | http://127.0.0.1:8001/mcp — see below |
+
+### Any agent, over MCP
+
+Every commissioned driver is also an MCP tool — so an agent that was never
+written into this codebase can use the hardware. The transport is a separate,
+stateless process that answers every request from the live registry
+(`docs/agents.md` explains why and how):
+
+```bash
+# in .env at the repo root: SELFAWARE_MCP_TOKEN=<any secret>
+make dev-mcp     # Streamable HTTP MCP on 127.0.0.1:8001 (backend must be on :8000;
+                 #   start order doesn't matter — it holds no state)
+
+# Claude Code: run `claude` from the repo root — it picks up the checked-in
+# .mcp.json and prompts once to approve the "selfaware" server. Then ask it
+# "what hardware can you reach right now?" (list_capabilities), or
+# "what's the light level?" (read_ldr — a tool that didn't exist until the
+# sensor was commissioned).
+```
+
+Static tools (`list_capabilities`, `read_sensor`, `get_sensor_health`) exist
+before anything is commissioned; per-driver `read_<slug>`/`set_<slug>` tools
+appear as drivers are admitted. The hardware-touching endpoints are bearer-token
+gated and fail closed — no token, no actuation, for anyone.
 
 ## Degradation matrix — everything is optional
 
@@ -193,6 +218,7 @@ backend/selfaware/
   memory/         agent-memory-server client (no-op degradable) + sqlite-vec stub
   observability/  logfire → OTLP → local Grafana
   api/            create_app factory, /ws, REST, lifespan
+  mcp_server.py   standalone MCP transport — the bench as tools for ANY agent
 frontend/src/     the agent theater (see docs/frontend.md)
 infra/            docker-compose (redis, agent-memory, otel-lgtm) + dashboards
 docs/             architecture · event-protocol · backend · frontend · agents ·

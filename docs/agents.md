@@ -64,8 +64,8 @@ fails loudly. `TestModel` proves schemas/instructions render keyless;
 ## MCP transport (`mcp_server.py`) — external agents, not just the copilot
 
 The copilot is one, first-party consumer of `read_<slug>`/`set_<slug>`. MCP
-is how *any* agent — Claude Desktop, a different vendor's agent, a script —
-gets the same capability, without being written into this codebase. Two
+is how *any* agent — Claude Code, a different vendor's agent, a script —
+gets the same capability, without being written into this codebase. Three
 design decisions worth knowing before touching this:
 
 - **A SEPARATE process, not mounted into `create_app()`.** Mounting a
@@ -78,27 +78,45 @@ design decisions worth knowing before touching this:
   `BoardSession`/`DriverRegistry` directly — which also means it can never
   violate the single-lock invariant (`hardware/session.py`); it's just
   another caller on the existing REST surface, same as the frontend.
+- **Stateless by construction.** `RegistryProvider._list_tools()` resolves
+  the tool list against `GET /api/drivers` on **every MCP request** — the
+  same resolve-at-call-time invariant as the copilot's dynamic toolset
+  above, at one loopback GET per request. There is no mirror, no event
+  listener, and no reconciliation pass, because there is no local tool
+  state that could drift: a re-commission, a repair that flips a slug
+  between read and set, or a demotion out of ACTIVE is simply reflected in
+  the next request's answer. Tool *calls* resolve through the same path, so
+  a de-commissioned driver's tool call fails with a clean not-found rather
+  than running against a stale record.
 - **Bearer-token gated, fails closed.** `POST /api/drivers/{slug}/read` and
   `/set` (`api/rest.py`) are the only two endpoints that can touch real
   hardware from outside the process. `SELFAWARE_MCP_TOKEN` unset means those
   endpoints refuse every request (403) — never "open to anyone," the same
   honest-degrade posture as everything else here, just at a boundary where
   the failure mode is real actuation instead of a blank dashboard widget.
+  One more boundary, stated plainly: the MCP port itself (:8001) carries no
+  auth — the loopback-only default bind (`SELFAWARE_MCP_HOST=127.0.0.1`) is
+  its only guard. Don't bind it wider without adding client auth.
 
-Tool lifecycle: `mcp_server.py` seeds from `GET /api/drivers` at startup,
-then listens on `/ws` for `driver.registered`/`driver.updated` and
-re-fetches `GET /api/drivers/{slug}` on either — one reconciliation path,
-not two — because `DriverUpdatedPayload` carries no `protocol_class`, so a
-repair that flips a slug between read and set can only be detected by
-re-fetching the record, not by trusting the event payload alone. A `slug →
-tool_kind` map (`_armed`) is what lets that reconciliation remove a stale
-`read_<slug>` and arm `set_<slug>` instead of leaving a broken tool name
-behind.
+Alongside the dynamic per-driver tools, three **static** tools exist from
+t=0 (before anything is commissioned): `list_capabilities` (board status +
+every driver and the tool that drives it), `read_sensor(slug)` (a gateway to
+the same token-gated read seam), and `get_sensor_health(slug)` (the same
+verdict the `sensor.health` event carries). They matter because fastmcp
+only pushes `tools/list_changed` from inside an active request context — a
+sensor commissioned while an external session is open will NOT appear in
+that session's tool list until the client re-lists (Claude Code: `/mcp` →
+reconnect). `list_capabilities` → `read_sensor("<slug>")` covers that gap
+with no reconnect at all.
 
 Honesty floor for callers we don't own: an external agent's system prompt is
 outside our control, so the guardrail travels with the data instead —
 every tool description and every response payload states the reading is
 live, taken at call time, not cached.
 
-Run it: `make dev-mcp` (needs `SELFAWARE_MCP_TOKEN` set the same in both
-`.env` and wherever the main backend reads it — see `.env.example`).
+Run it: set `SELFAWARE_MCP_TOKEN` once in `.env`, then `make dev-backend` +
+`make dev-mcp` (the Makefile exports `.env` to both; start order doesn't
+matter). Claude Code picks the server up from the repo's checked-in
+`.mcp.json` (`http://127.0.0.1:8001/mcp`) — run `claude` from the repo root
+and approve the project server once. From elsewhere:
+`claude mcp add --transport http selfaware http://127.0.0.1:8001/mcp`.
