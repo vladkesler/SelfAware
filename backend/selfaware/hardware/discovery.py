@@ -11,8 +11,15 @@ Both probe snippets are HOST-authored constants — the LLM never writes scan
 code, because discovery must be deterministic (host/LLM split, invariant #2).
 """
 
+import ast
 import glob as _glob
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from selfaware.events.payloads import DeviceFoundPayload
+
+if TYPE_CHECKING:
+    from selfaware.config import Settings
+    from selfaware.hardware.session import BoardSession
 
 
 async def find_board_port(glob_pattern: str) -> str | None:
@@ -50,6 +57,49 @@ ADC_SIGNATURE_SNIPPET = (
     "    time.sleep_ms(5)\n"
     "print(s)\n"
 )
+
+class I2CScanError(RuntimeError):
+    """One scan failed in a nameable way — board traceback, timeout, or
+    unparseable output. `detail` carries the verbatim evidence."""
+
+    def __init__(self, message: str, detail: str | None = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.detail = detail
+
+
+async def scan_i2c_addresses(session: "BoardSession", settings: "Settings") -> list[int]:
+    """One I2C scan through session.exec (LOCK-acquiring) -> sorted addresses.
+
+    The single scan-and-parse implementation — the WS cmd.board_scan handler,
+    the REST /api/board/scan endpoint, and the DiscoveryWatcher all run this
+    exact snippet the same way. Raises I2CScanError; classification is the
+    caller's job (device_found_payload below).
+    """
+    snippet = I2C_SCAN_SNIPPET.format(sda=settings.pins_i2c_sda, scl=settings.pins_i2c_scl)
+    result = await session.exec(snippet)
+    if not result.ok:
+        raise I2CScanError("I2C scan raised on the board", detail=result.stderr or "timeout")
+    try:
+        addrs = ast.literal_eval(result.last_line) if result.last_line else []
+        return sorted(int(a) for a in addrs)
+    except (ValueError, SyntaxError, TypeError) as exc:
+        raise I2CScanError(f"unparseable scan output: {result.last_line!r}") from exc
+
+
+def device_found_payload(addr: int) -> DeviceFoundPayload:
+    """Classify one scanned address against KNOWN_I2C_DEVICES — the honesty
+    floor in code: a known address is 'exact' + suggested_spec, anything else
+    is presence-only 'unknown'."""
+    known = KNOWN_I2C_DEVICES.get(addr)
+    return DeviceFoundPayload(
+        bus="i2c",
+        addr=addr,
+        identity=known["identity"] if known else None,
+        confidence="exact" if known else "unknown",
+        suggested_spec=known["suggested_spec"] if known else None,
+    )
+
 
 # addr -> identity + pre-filled BringupSpec fields (suggested_spec rides the
 # discovery.device_found payload so the UI can offer one-click commission).

@@ -14,6 +14,7 @@ from selfaware.hardware.oled_narrator import (
     NarratorModel,
     OledNarrator,
     agent_lines,
+    message_lines,
     telemetry_lines,
 )
 from selfaware.hardware.oled_render import build_init_payload, draw_payload
@@ -228,3 +229,62 @@ async def test_absent_display_backs_off_and_does_not_spam() -> None:
 
     await narrator._maybe_render()  # noqa: SLF001 — should be a no-op during backoff
     assert len(board.exec_log) == execs_after_first  # no new wire traffic
+
+
+# --- the external message view (MCP display_message) ---------------------------
+
+
+def test_message_lines_wrap_and_name_the_speaker() -> None:
+    lines, invert = message_lines("HELLO FROM CLAUDE this wraps across rows")
+    assert lines[0] == "AGENT SAYS"  # the banner names the speaker
+    assert invert is True
+    assert any("HELLO" in line for line in lines[1:])
+
+
+async def test_say_shows_then_expires_back_to_rotation() -> None:
+    bus = EventBus()
+    settings = Settings(_env_file=None, mock_board=True, mock_pace_s=0.0)
+    board = MockBoard()
+    await board.connect()
+    session = BoardSession(board, bus, settings)
+    narrator = OledNarrator(session, bus, settings)
+    narrator._consumer = object()  # noqa: SLF001 — satisfy say()'s started check without the bus task
+
+    assert narrator.say("HELLO FROM CLAUDE", hold_s=60.0) is True
+    assert narrator._current_view() == "message"  # noqa: SLF001
+    narrator._model.connected = True  # noqa: SLF001
+    await narrator._maybe_render()  # noqa: SLF001
+    joined = "\n".join(board.exec_log)  # 16-col wrap may split the words across rows
+    assert "HELLO" in joined and "CLAUDE" in joined  # reached the wire
+    assert "AGENT SAYS" in joined
+
+    narrator._message_until = 0.0  # noqa: SLF001 — force expiry
+    assert narrator._current_view() in ("agent", "telemetry")  # noqa: SLF001
+    assert narrator._message is None  # noqa: SLF001 — cleared, not lingering
+
+
+async def test_say_never_preempts_an_active_commission() -> None:
+    bus = EventBus()
+    settings = Settings(_env_file=None, mock_board=True, mock_pace_s=0.0)
+    board = MockBoard()
+    await board.connect()
+    narrator = OledNarrator(BoardSession(board, bus, settings), bus, settings)
+    narrator._consumer = object()  # noqa: SLF001
+    narrator._model.active = True  # noqa: SLF001 — a commission owns the screen
+
+    assert narrator.say("interruption attempt", hold_s=60.0) is True
+    assert narrator._current_view() == "agent"  # noqa: SLF001 — the commission wins
+
+
+async def test_say_refuses_honestly_when_absent_or_not_started() -> None:
+    bus = EventBus()
+    settings = Settings(_env_file=None, mock_board=True, mock_pace_s=0.0)
+    board = MockBoard()
+    await board.connect()
+    narrator = OledNarrator(BoardSession(board, bus, settings), bus, settings)
+
+    assert narrator.say("hi") is False  # not started — no consumer task
+
+    narrator._consumer = object()  # noqa: SLF001
+    narrator._absent = True  # noqa: SLF001 — display proved missing
+    assert narrator.say("hi") is False

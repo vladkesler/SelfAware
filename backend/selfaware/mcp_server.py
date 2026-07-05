@@ -32,9 +32,20 @@ Known limitation, stated plainly: fastmcp only pushes tools/list_changed
 from inside an active request context, so a sensor commissioned while an
 MCP client's session is open will NOT appear in that session's tool list
 until the client re-lists (e.g. Claude Code's /mcp -> reconnect). The
-static `read_sensor` gateway tool below exists precisely for that gap — it
-is always present, so a freshly commissioned slug is usable immediately via
-list_capabilities -> read_sensor, no reconnect required.
+static `read_sensor`/`set_actuator` gateway tools below exist precisely for
+that gap — they are always present, so a freshly commissioned slug is usable
+immediately via list_capabilities -> read_sensor/set_actuator, no reconnect
+required.
+
+Beyond read/set, the static surface covers the full bench lifecycle so an
+external agent can drive the whole story: probe_bus (live I2C scan),
+list_commissionable_devices (the preset catalog), commission_device +
+get_commission_status (the AUTHOR->MEDIC self-repair loop, 202-then-poll
+because a commission outlives any sane HTTP/tool timeout), get_driver_code
+(the silicon-verified source, provenance included), get_sensor_history, and
+display_message (the physical OLED). Every hardware-touching call still goes
+through the backend's token-gated REST seam — this process never grows local
+state.
 
 Honesty floor for callers we don't control: every tool description and every
 response payload says the reading is live, taken at call time — since an
@@ -63,6 +74,13 @@ BACKEND_URL = os.environ.get("SELFAWARE_MCP_BACKEND_URL", "http://localhost:8000
 TOKEN = os.environ.get("SELFAWARE_MCP_TOKEN", "")
 HOST = os.environ.get("SELFAWARE_MCP_HOST", "127.0.0.1")
 PORT = int(os.environ.get("SELFAWARE_MCP_PORT", "8001"))
+
+# commission_device polls the backend's status endpoint inside one tool call:
+# WAIT_S is deliberately under typical MCP client tool timeouts, so a slow real
+# commission degrades to an honest "still running, poll get_commission_status"
+# instead of a client-side timeout that loses the commission_id.
+COMMISSION_WAIT_S = float(os.environ.get("SELFAWARE_MCP_COMMISSION_WAIT_S", "45"))
+COMMISSION_POLL_S = float(os.environ.get("SELFAWARE_MCP_COMMISSION_POLL_S", "2.0"))
 
 _client: httpx.AsyncClient | None = None
 
@@ -207,6 +225,146 @@ async def get_sensor_health(slug: str) -> dict[str, Any]:
     resp = await _client.get(f"/api/drivers/{slug}/health")
     if resp.status_code != 200:
         raise RuntimeError(f"get_sensor_health({slug!r}): backend said {resp.status_code} — {resp.text}")
+    return resp.json()
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+async def list_commissionable_devices() -> dict[str, Any]:
+    """The bench's preset catalog: every device commission_device can bring up
+    (slug, protocol class, pins, unit, plausibility window) plus whether it is
+    ALREADY commissioned. commissioned=true means its tool works right now via
+    read_sensor / set_actuator — do not re-commission it. Call this (or
+    probe_bus) before commission_device."""
+    assert _client is not None
+    resp = await _client.get("/api/presets")
+    if resp.status_code != 200:
+        raise RuntimeError(f"list_commissionable_devices: backend said {resp.status_code} — {resp.text}")
+    return resp.json()
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+async def probe_bus() -> dict[str, Any]:
+    """Live I2C bus scan on the real board: every responding address, matched
+    against the known-device table. A match with a preset_slug can be brought
+    up immediately via commission_device(preset_slug); an unknown address is
+    honest presence-only — the hardware answered, but an address cannot reveal
+    the part."""
+    assert _client is not None
+    resp = await _client.post("/api/board/scan", headers=_headers())
+    if resp.status_code != 200:
+        raise RuntimeError(f"probe_bus: backend said {resp.status_code} — {resp.text}")
+    return resp.json()
+
+
+@mcp.tool
+async def commission_device(preset_slug: str) -> dict[str, Any]:
+    """Commission a device from the preset catalog: an LLM author writes a
+    MicroPython driver, a static gate vets it, and the REAL board runs it —
+    with up to 4 self-repair attempts fed by the board's verbatim tracebacks.
+    Takes 30-120s; this call waits up to ~45s and otherwise returns
+    status='running' with a commission_id — then poll get_commission_status,
+    do NOT call commission_device again (one commission at a time; a 409 means
+    one is already in flight). On 'passed' the driver is live immediately via
+    read_sensor / set_actuator. Find slugs via list_commissionable_devices or
+    probe_bus."""
+    assert _client is not None
+    resp = await _client.post("/api/commission", json={"preset_slug": preset_slug}, headers=_headers())
+    if resp.status_code != 202:
+        raise RuntimeError(f"commission_device: backend said {resp.status_code} — {resp.text}")
+    commission_id = resp.json()["commission_id"]
+    deadline = asyncio.get_running_loop().time() + COMMISSION_WAIT_S
+    while asyncio.get_running_loop().time() < deadline:
+        await asyncio.sleep(COMMISSION_POLL_S)
+        status_resp = await _client.get(f"/api/commission/{commission_id}")
+        if status_resp.status_code != 200:
+            raise RuntimeError(
+                f"commission_device: status poll said {status_resp.status_code} — {status_resp.text}"
+            )
+        status = status_resp.json()
+        if status.get("status") != "running":
+            return {
+                **status,
+                "note": "terminal — on 'passed' the driver is live NOW via read_sensor/set_actuator",
+            }
+    return {
+        "status": "running",
+        "commission_id": commission_id,
+        "note": (
+            "still running (LLM codegen + on-silicon tests take up to ~2min) — poll "
+            "get_commission_status(commission_id); do NOT call commission_device again, one runs at a time"
+        ),
+    }
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+async def get_commission_status(commission_id: str) -> dict[str, Any]:
+    """Poll a running commission by the id commission_device returned: either
+    status='running', or the terminal outcome (passed/failed/crashed) with
+    attempts_used and the honest per-attempt record — verbatim board
+    tracebacks included."""
+    assert _client is not None
+    resp = await _client.get(f"/api/commission/{commission_id}")
+    if resp.status_code != 200:
+        raise RuntimeError(f"get_commission_status({commission_id!r}): backend said {resp.status_code} — {resp.text}")
+    return resp.json()
+
+
+@mcp.tool
+async def set_actuator(slug: str, level: float) -> dict[str, Any]:
+    """Drive any commissioned actuator by slug (level 0.0-1.0; 0 is off). Same
+    verified driver and hardware lock as the per-actuator set_<slug> tools —
+    use this when an actuator was commissioned after your session's tool list
+    was built (find slugs via list_capabilities)."""
+    assert _client is not None
+    resp = await _client.post(f"/api/drivers/{slug}/set", json={"level": level}, headers=_headers())
+    if resp.status_code != 200:
+        raise RuntimeError(f"set_actuator({slug!r}): backend said {resp.status_code} — {resp.text}")
+    return {"slug": slug, "level": level, "ok": True}
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+async def get_sensor_history(slug: str) -> dict[str, Any]:
+    """Recent reading history for a commissioned sensor: raw (unix_ts, value)
+    points from the backend's poller — enough to see a trend, spot a step
+    change, or corroborate a live reading."""
+    assert _client is not None
+    resp = await _client.get(f"/api/drivers/{slug}/history")
+    if resp.status_code != 200:
+        raise RuntimeError(f"get_sensor_history({slug!r}): backend said {resp.status_code} — {resp.text}")
+    return {**resp.json(), "note": "historical points, not a live reading — use read_sensor for now"}
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
+async def get_driver_code(slug: str) -> dict[str, Any]:
+    """The MicroPython driver source for a commissioned device — the exact
+    code the author agent wrote and the REAL board verified on silicon, plus
+    its provenance (attempts_used, verified_at). The registry stores exactly
+    the text that passed; showing it is part of the honesty story."""
+    assert _client is not None
+    resp = await _client.get(f"/api/drivers/{slug}")
+    if resp.status_code != 200:
+        raise RuntimeError(f"get_driver_code({slug!r}): backend said {resp.status_code} — {resp.text}")
+    record = DriverRecord.model_validate(resp.json())
+    return {
+        "slug": record.slug,
+        "display_name": record.display_name,
+        "protocol_class": record.protocol_class.value,
+        "status": record.status.value,
+        "driver_code": record.driver_code,
+        "verified_at": record.verified_at.isoformat() if record.verified_at else None,
+        "attempts_used": record.attempts_used,
+    }
+
+
+@mcp.tool
+async def display_message(text: str) -> dict[str, Any]:
+    """Write a short message (<=120 chars) on the bench's physical OLED screen
+    for ~8 seconds. Honest refusal when no display is present; if a commission
+    is animating the screen, the message shows after it finishes."""
+    assert _client is not None
+    resp = await _client.post("/api/oled/say", json={"text": text}, headers=_headers())
+    if resp.status_code != 200:
+        raise RuntimeError(f"display_message: backend said {resp.status_code} — {resp.text}")
     return resp.json()
 
 

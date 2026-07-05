@@ -88,26 +88,50 @@ design decisions worth knowing before touching this:
   the next request's answer. Tool *calls* resolve through the same path, so
   a de-commissioned driver's tool call fails with a clean not-found rather
   than running against a stale record.
-- **Bearer-token gated, fails closed.** `POST /api/drivers/{slug}/read` and
-  `/set` (`api/rest.py`) are the only two endpoints that can touch real
-  hardware from outside the process. `SELFAWARE_MCP_TOKEN` unset means those
-  endpoints refuse every request (403) — never "open to anyone," the same
-  honest-degrade posture as everything else here, just at a boundary where
-  the failure mode is real actuation instead of a blank dashboard widget.
+- **Bearer-token gated, fails closed.** Every endpoint that can touch real
+  hardware from outside the process (`POST /api/drivers/{slug}/read`, `/set`,
+  `/api/board/scan`, `/api/commission`, `/api/oled/say` — `api/rest.py`) is
+  guarded. `SELFAWARE_MCP_TOKEN` unset means those endpoints refuse every
+  request (403) — never "open to anyone," the same honest-degrade posture as
+  everything else here, just at a boundary where the failure mode is real
+  actuation instead of a blank dashboard widget.
   One more boundary, stated plainly: the MCP port itself (:8001) carries no
   auth — the loopback-only default bind (`SELFAWARE_MCP_HOST=127.0.0.1`) is
   its only guard. Don't bind it wider without adding client auth.
 
-Alongside the dynamic per-driver tools, three **static** tools exist from
-t=0 (before anything is commissioned): `list_capabilities` (board status +
-every driver and the tool that drives it), `read_sensor(slug)` (a gateway to
-the same token-gated read seam), and `get_sensor_health(slug)` (the same
-verdict the `sensor.health` event carries). They matter because fastmcp
-only pushes `tools/list_changed` from inside an active request context — a
-sensor commissioned while an external session is open will NOT appear in
-that session's tool list until the client re-lists (Claude Code: `/mcp` →
-reconnect). `list_capabilities` → `read_sensor("<slug>")` covers that gap
-with no reconnect at all.
+Alongside the dynamic per-driver tools, a **static** surface exists from t=0
+(before anything is commissioned), covering the whole bench lifecycle:
+
+- **Discover** — `list_capabilities` (board status + every driver and the
+  tool that drives it), `probe_bus` (a live I2C scan; matches against the
+  known-device table carry a `preset_slug`), and
+  `list_commissionable_devices` (the preset catalog, annotated with
+  what's already commissioned).
+- **Commission** — `commission_device(preset_slug)` starts the full
+  AUTHOR→MEDIC self-repair loop and polls the backend inside the call for up
+  to ~45 s (`SELFAWARE_MCP_COMMISSION_WAIT_S`); a slower real run returns an
+  honest `status: "running"` + `commission_id` for `get_commission_status`.
+  The REST seam is 202-then-poll (`POST /api/commission` →
+  `GET /api/commission/{id}`) because a commission outlives any sane HTTP or
+  MCP-client timeout, and `CommissionService` keeps a small ring of terminal
+  outcomes (passed/failed/**crashed**, with the verbatim per-attempt record)
+  so a caller who timed out and lost its request can still learn what
+  happened. An MCP-initiated commission publishes the same `commission.*`
+  events as any other — the web console animates it for free.
+- **Operate** — `read_sensor(slug)` / `set_actuator(slug, level)` gateways
+  to the same token-gated seams, `get_sensor_health(slug)` (the same verdict
+  the `sensor.health` event carries), `get_sensor_history(slug)` (the
+  sparkline's points), `get_driver_code(slug)` (the silicon-verified source
+  with provenance — the registry stores exactly the text that passed), and
+  `display_message(text)` (a short message on the physical OLED, honest 409
+  when no display is present).
+
+The gateways matter because fastmcp only pushes `tools/list_changed` from
+inside an active request context — a sensor commissioned while an external
+session is open will NOT appear in that session's tool list until the client
+re-lists (Claude Code: `/mcp` → reconnect). `list_capabilities` →
+`read_sensor("<slug>")` / `set_actuator("<slug>", …)` covers that gap with
+no reconnect at all.
 
 Honesty floor for callers we don't own: an external agent's system prompt is
 outside our control, so the guardrail travels with the data instead —

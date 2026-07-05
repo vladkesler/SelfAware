@@ -57,6 +57,20 @@ last-resort fallback.
    reason. Narrate: *"MCP is the difference between 'our chatbot can read a
    sensor' and 'any agent can gain a verified physical capability' — that's
    the admission layer, not the transport layer."*
+
+   **The escalation (optional, rehearse it first): the external agent runs
+   the WHOLE lifecycle itself.** Ask "what's on the bus?" → `probe_bus`
+   runs a live I2C scan and the SHTC3 match arrives with its preset slug.
+   Ask "bring it up" → `commission_device("shtc3")` starts the same
+   AUTHOR→MEDIC loop the judges just watched — **the console animates it in
+   the other window while a foreign agent drives** — and the tool call
+   returns the pass with its honest attempt count. Then "show me the code
+   you're running" → `get_driver_code` prints the MicroPython the author
+   wrote and the board verified. Then "turn the fan on" →
+   `set_actuator("fan", 0.6)` — physical air moves on a command from a
+   stock terminal. Finish with `display_message("HELLO FROM CLAUDE")`: the
+   bench's own OLED answers. Every one of those calls went through the same
+   token-gated seam and the same single hardware lock as everything else.
 9. **The glass brain (Grafana).** Open the Commission Theater dashboard: the
    trace waterfall of the exact commission the judges just watched —
    generate/validate/deploy/test spans, the failed attempt, token usage.
@@ -91,8 +105,8 @@ last-resort fallback.
    `tools/list_changed` from background changes; this is a server-library
    limitation, not Claude Code's. Two rehearsed outs, decided in advance:
    `/mcp` → reconnect selfaware (~2 s, always yields the fresh list), or the
-   always-present `read_sensor("<slug>")` gateway tool, which works with no
-   reconnect at all.
+   always-present `read_sensor("<slug>")` / `set_actuator("<slug>", level)`
+   gateway tools, which work with no reconnect at all.
 5. Keep this beat sequenced, not interleaved with beat 4's `make demo-mock`
    rehearsal: MockBoard's scripted fail→pass exchanges are consumed in
    strict order, and a stray MCP-triggered read mid-rehearsal will desync

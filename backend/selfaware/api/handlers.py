@@ -8,26 +8,23 @@ paths users actually hit get named error codes instead
 (docs/event-protocol.md: model_unavailable, board_offline, mock_only, ...).
 """
 
-import ast
-
 from selfaware.agents.author import ModelUnavailable
 from selfaware.agents.copilot import copilot_agent
 from selfaware.agents.streaming import run_agent_streaming
 from selfaware.api.state import CURRENT_CONNECTION, AppState
-from selfaware.bringup.models import BringupSpec
+from selfaware.bringup.service import SpecResolutionError, resolve_spec
 from selfaware.events.envelope import Command
 from selfaware.events.payloads import (
     BoardScanCommand,
     ChatCommand,
     CommissionCommand,
-    DeviceFoundPayload,
     ErrorPayload,
     ReadCommand,
     SetCommand,
     StimulateCommand,
 )
 from selfaware.events.types import AgentId, CommandType, EventType
-from selfaware.hardware.discovery import I2C_SCAN_SNIPPET, KNOWN_I2C_DEVICES
+from selfaware.hardware.discovery import I2CScanError, device_found_payload, scan_i2c_addresses
 from selfaware.hardware.mock_board import MockBoard
 from selfaware.registry.store import DriverToolError
 
@@ -56,35 +53,18 @@ def _error(state: AppState, cmd: Command, code: str, message: str, detail: str |
 def _make_commission(state: AppState):
     async def handle(cmd: Command) -> None:
         payload = CommissionCommand.model_validate(cmd.payload)
-        if payload.preset_slug:
-            spec = next((s for s in state.settings.default_specs() if s.slug == payload.preset_slug), None)
-            if spec is None:
-                _error(state, cmd, "unknown_preset", f"no preset named {payload.preset_slug!r}")
-                return
-        else:
-            if not (payload.slug and payload.protocol_class and payload.pins):
-                _error(state, cmd, "bad_spec", "full spec needs at least slug, protocol_class and pins")
-                return
-            spec = BringupSpec(
-                slug=payload.slug,
-                display_name=payload.display_name or payload.slug,
-                protocol_class=payload.protocol_class,
-                pins=payload.pins,
-                i2c_addr=payload.i2c_addr,
-                expected_min=payload.expected_min,
-                expected_max=payload.expected_max,
-                unit=payload.unit,
-                stimulus_hint=payload.stimulus_hint,
-                verify_with_slug=payload.verify_with_slug,
-                extra_context=payload.extra_context,
-            )
+        try:
+            spec = resolve_spec(payload, state.settings)
+        except SpecResolutionError as exc:
+            _error(state, cmd, exc.code, exc.message)
+            return
         if not state.settings.mock_author:
             # Fail BEFORE the loop starts so a missing key is one clean error,
             # not a commission.started followed by a crash event.
             try:
-                from selfaware.agents.author import resolve_model
+                from selfaware.agents.author import ensure_model_available
 
-                resolve_model(state.settings, state.settings.author_model)
+                ensure_model_available(state.settings)
             except ModelUnavailable as exc:
                 _error(state, cmd, "model_unavailable", str(exc))
                 return
@@ -163,30 +143,13 @@ def _make_board_scan(state: AppState):
         if not state.transport.connected:
             _error(state, cmd, "board_offline", "board is not connected — nothing to scan")
             return
-        snippet = I2C_SCAN_SNIPPET.format(
-            sda=state.settings.pins_i2c_sda, scl=state.settings.pins_i2c_scl
-        )
-        result = await state.session.exec(snippet)
-        if not result.ok:
-            _error(state, cmd, "scan_failed", "I2C scan raised on the board", detail=result.stderr or "timeout")
-            return
         try:
-            addrs = ast.literal_eval(result.last_line) if result.last_line else []
-        except (ValueError, SyntaxError):
-            _error(state, cmd, "scan_failed", f"unparseable scan output: {result.last_line!r}")
+            addrs = await scan_i2c_addresses(state.session, state.settings)
+        except I2CScanError as exc:
+            _error(state, cmd, "scan_failed", exc.message, detail=exc.detail)
             return
         for addr in addrs:
-            known = KNOWN_I2C_DEVICES.get(addr)
-            state.bus.publish(
-                EventType.DISCOVERY_DEVICE_FOUND,
-                DeviceFoundPayload(
-                    bus="i2c",
-                    addr=addr,
-                    identity=known["identity"] if known else None,
-                    confidence="exact" if known else "unknown",
-                    suggested_spec=known["suggested_spec"] if known else None,
-                ),
-            )
+            state.bus.publish(EventType.DISCOVERY_DEVICE_FOUND, device_found_payload(addr))
 
     return handle
 

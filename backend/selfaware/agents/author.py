@@ -109,6 +109,13 @@ def resolve_model(settings: Settings, override: str | None = None) -> str | Mode
     return model
 
 
+def ensure_model_available(settings: Settings) -> None:
+    """Fail BEFORE a commission starts when the author model can't run — one
+    clean ModelUnavailable instead of a commission.started followed by a crash.
+    Shared by the WS cmd.commission handler and POST /api/commission."""
+    resolve_model(settings, settings.author_model)
+
+
 author_agent: Agent[AuthorDeps, DriverGenOutput] = Agent(
     # model deliberately omitted — resolved per run (keyless import, TestModel-friendly)
     deps_type=AuthorDeps,

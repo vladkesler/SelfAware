@@ -14,7 +14,6 @@ Honesty floor, encoded in confidence levels:
     (ADC classification is not wired yet — see _classify_adc.)
 """
 
-import ast
 import asyncio
 import contextlib
 
@@ -22,7 +21,7 @@ from selfaware.config import Settings
 from selfaware.events.bus import EventBus
 from selfaware.events.payloads import DeviceFoundPayload, DeviceLostPayload
 from selfaware.events.types import EventType
-from selfaware.hardware.discovery import I2C_SCAN_SNIPPET, KNOWN_I2C_DEVICES
+from selfaware.hardware.discovery import I2CScanError, device_found_payload, scan_i2c_addresses
 from selfaware.hardware.session import BoardSession
 
 
@@ -70,16 +69,10 @@ class DiscoveryWatcher:
         """
         if not self._session.transport.connected:
             return
-        snippet = I2C_SCAN_SNIPPET.format(
-            sda=self._settings.pins_i2c_sda, scl=self._settings.pins_i2c_scl
-        )
-        result = await self._session.exec(snippet)
-        if not result.ok:
-            return  # a scan traceback/timeout is noise, not a discovery event
         try:
-            scanned = {int(a) for a in ast.literal_eval(result.last_line)} if result.last_line else set()
-        except (ValueError, SyntaxError, TypeError):
-            return
+            scanned = set(await scan_i2c_addresses(self._session, self._settings))
+        except I2CScanError:
+            return  # a scan traceback/timeout is noise, not a discovery event
         self._diff_i2c(scanned)
 
     def current_presences(self) -> list[DeviceFoundPayload]:
@@ -91,35 +84,13 @@ class DiscoveryWatcher:
         a client never needs to replay missed events), mirroring how hello
         restates board + drivers.
         """
-        out: list[DeviceFoundPayload] = []
-        for addr in sorted(self._known_addrs):
-            known = KNOWN_I2C_DEVICES.get(addr)
-            out.append(
-                DeviceFoundPayload(
-                    bus="i2c",
-                    addr=addr,
-                    identity=known["identity"] if known else None,
-                    confidence="exact" if known else "unknown",
-                    suggested_spec=known["suggested_spec"] if known else None,
-                )
-            )
-        return out
+        return [device_found_payload(addr) for addr in sorted(self._known_addrs)]
 
     def _diff_i2c(self, scanned: set[int]) -> None:
         """New addr -> device_found (known -> exact + suggested_spec); gone addr
         -> device_lost. Diffs against the last scan so steady state is silent."""
         for addr in sorted(scanned - self._known_addrs):
-            known = KNOWN_I2C_DEVICES.get(addr)
-            self._bus.publish(
-                EventType.DISCOVERY_DEVICE_FOUND,
-                DeviceFoundPayload(
-                    bus="i2c",
-                    addr=addr,
-                    identity=known["identity"] if known else None,
-                    confidence="exact" if known else "unknown",
-                    suggested_spec=known["suggested_spec"] if known else None,
-                ),
-            )
+            self._bus.publish(EventType.DISCOVERY_DEVICE_FOUND, device_found_payload(addr))
         for addr in sorted(self._known_addrs - scanned):
             self._bus.publish(
                 EventType.DISCOVERY_DEVICE_LOST,

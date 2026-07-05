@@ -152,6 +152,17 @@ def agent_lines(
     return ([banner, *body[:6]], True)
 
 
+def message_lines(text: str) -> tuple[list[str], bool]:
+    """The agent-message card: an external caller (the MCP display_message
+    tool) speaking on the physical display. Same wrap discipline as every
+    other card; the banner names the speaker so a viewer never mistakes it
+    for the board's own narration."""
+    body = _wrap(text, 6)
+    if not body:
+        body = ["(empty message)"]
+    return (["AGENT SAYS", *body], True)
+
+
 def _fmt_value(v: float) -> str:
     if abs(v - round(v)) < 1e-6:
         return str(int(round(v)))
@@ -275,6 +286,9 @@ class OledNarrator:
         # absent-OLED backoff (don't hammer a bus with no display)
         self._absent = False
         self._retry_at = 0.0
+        # external message override (MCP display_message) — text + expiry
+        self._message: str | None = None
+        self._message_until = 0.0
 
     # --- lifecycle ------------------------------------------------------------
 
@@ -318,9 +332,22 @@ class OledNarrator:
                 pass
             await asyncio.sleep(self._settings.oled_refresh_s)
 
+    def say(self, text: str, hold_s: float = 8.0) -> bool:
+        """Queue an external message for the display (the MCP display_message
+        tool). Returns False — honestly — when the narrator is disabled or the
+        OLED has proven absent; True means the render loop will show it, though
+        an active commission keeps owning the screen until it finishes."""
+        if not self._settings.oled_enabled or self._consumer is None or self._absent:
+            return False
+        self._message = text
+        self._message_until = time.monotonic() + hold_s
+        self._last_payload = None  # force a draw even if the frame matches
+        return True
+
     def _current_view(self) -> str:
-        """Force the agent card during (and briefly after) a commission; else
-        rotate agent<->telemetry on the slow cadence."""
+        """Force the agent card during (and briefly after) a commission; then
+        an external message if one is live; else rotate agent<->telemetry on
+        the slow cadence."""
         m = self._model
         now = time.monotonic()
         if m.active:
@@ -329,6 +356,10 @@ class OledNarrator:
             if now - m.terminal_at < self._settings.oled_rotate_s * 1.5:
                 return "agent"
             m.active = False  # terminal frame shown long enough; resume idle
+        if self._message is not None:
+            if now < self._message_until:
+                return "message"
+            self._message = None  # expired; resume the idle rotation
         if now - self._rotate_at >= self._settings.oled_rotate_s:
             self._rotate_at = now
             self._view = "telemetry" if self._view == "agent" else "agent"
@@ -336,7 +367,9 @@ class OledNarrator:
 
     def _frame(self, view: str) -> str:
         m = self._model
-        if view == "telemetry":
+        if view == "message":
+            lines, invert = message_lines(self._message or "")
+        elif view == "telemetry":
             lines, invert = telemetry_lines(
                 connected=m.connected, mock=m.mock, readings=m.readings, health=m.health
             )
