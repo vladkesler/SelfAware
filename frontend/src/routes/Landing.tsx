@@ -44,8 +44,8 @@ const FITS: Fit[] = [
     body: 'A robot should not wait for a firmware engineer every time it grows a new gripper. New hardware introduces itself, proves itself, and gets to work.',
   },
   {
-    title: 'Labs',
-    body: 'An experiment is only as good as its instruments. Commission a probe in minutes — and keep the proof that it was reading truthfully when the data was taken.',
+    title: 'Industrial systems',
+    body: 'One admission loop, four device classes — analog, I2C/SPI, pulse-timing, output — covers effectively any sensor or actuator a plant, line, or fleet needs. Not a robotics demo; the same loop scales to whatever’s plugged in.',
   },
   {
     title: 'Connected devices',
@@ -144,7 +144,8 @@ export default function Landing() {
         <div className="industry-lead">
           <p>
             SelfAware is built for teams whose software does not just read data — it depends on
-            the physical world being true.
+            the physical world being true, whatever the device, at whatever scale they&apos;re
+            running it.
           </p>
         </div>
 
