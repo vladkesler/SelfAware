@@ -10,9 +10,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { WsStatus } from '../../lib/ws';
 import type { BoardSlice } from '../../state/slices/board';
 import type { CommissionPreset } from '../../lib/presets';
+import type { CustomSpec } from '../../lib/customSpecs';
 import { PROTOCOL_VERSION } from '../../types/events';
 import { StatusDot } from '../primitives/StatusDot';
 import { ConnectAgent } from './ConnectAgent';
+import { TeachDevice } from './TeachDevice';
 
 export interface BoardStatusProps {
   ws: WsStatus;
@@ -25,9 +27,14 @@ export interface BoardStatusProps {
   busySlug?: string | undefined;
   lastError?: { code: string; message: string; at: string } | undefined;
   presets: CommissionPreset[];
+  /** The taught-device shelf (localStorage) — rendered by TeachDevice. */
+  customSpecs: CustomSpec[];
   /** Disable the commission picker while the bench is busy. */
   busy: boolean;
   onCommission: (slug: string) => void;
+  onTeach: (spec: CustomSpec) => void;
+  onTeachAndCommission: (spec: CustomSpec) => void;
+  onRemoveCustom: (slug: string) => void;
 }
 
 const ERROR_DISMISS_MS = 6000;
@@ -47,8 +54,12 @@ export function BoardStatus({
   busySlug,
   lastError,
   presets,
+  customSpecs,
   busy,
   onCommission,
+  onTeach,
+  onTeachAndCommission,
+  onRemoveCustom,
 }: BoardStatusProps) {
   const menuRef = useRef<HTMLDetailsElement>(null);
 
@@ -76,20 +87,64 @@ export function BoardStatus({
       <details className="fascia__cmd" ref={menuRef}>
         <summary className="fascia__cmd-btn">commission ▸</summary>
         <div className="fascia__cmd-menu">
-          <div className="fascia__cmd-label">teach it once</div>
-          {presets.map((p) => (
-            <button
-              key={p.slug}
-              type="button"
-              className="fascia__cmd-item"
-              disabled={busy}
-              onClick={() => pick(p.slug)}
-            >
-              {p.label}
-            </button>
-          ))}
+          <div className="fascia__cmd-label">on the board</div>
+          {presets
+            .filter((p) => !p.custom)
+            .map((p) => (
+              <button
+                key={p.slug}
+                type="button"
+                className="fascia__cmd-item cmd-item"
+                disabled={busy}
+                onClick={() => pick(p.slug)}
+              >
+                <span className="cmd-item__name">{p.label}</span>
+                <span className="cmd-item__meta">{p.meta}</span>
+              </button>
+            ))}
+          {presets.some((p) => p.custom) ? (
+            <>
+              <div className="fascia__cmd-label cmd-taught-label">
+                <span className="cmd-taught-dot" aria-hidden /> taught by you
+              </div>
+              {presets
+                .filter((p) => p.custom)
+                .map((p) => (
+                  <div key={p.slug} className="cmd-item-row">
+                    <button
+                      type="button"
+                      className="fascia__cmd-item cmd-item"
+                      disabled={busy}
+                      onClick={() => pick(p.slug)}
+                    >
+                      <span className="cmd-item__name">{p.label}</span>
+                      <span className="cmd-item__meta">{p.meta}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="cmd-item-x"
+                      aria-label={`forget ${p.slug}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveCustom(p.slug);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+            </>
+          ) : null}
         </div>
       </details>
+
+      <TeachDevice
+        customSpecs={customSpecs}
+        busy={busy}
+        onTeach={onTeach}
+        onTeachAndCommission={onTeachAndCommission}
+        onRemoveCustom={onRemoveCustom}
+      />
 
       <ConnectAgent />
 

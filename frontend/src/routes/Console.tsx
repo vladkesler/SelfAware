@@ -6,9 +6,17 @@
  * One story at a time, told once. Commands go out via getTransport().send().
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { ClientCommand } from '../types/events';
 import type { DriverCard } from '../types/domain';
+import {
+  loadCustomSpecs,
+  removeCustomSpec,
+  saveCustomSpec,
+  specMeta,
+  toCommissionPayload,
+  type CustomSpec,
+} from '../lib/customSpecs';
 import { useTransport } from '../hooks/useTransport';
 import { getTransport } from '../lib/transport';
 import { newCommandId } from '../lib/ids';
@@ -55,8 +63,40 @@ export default function Console() {
 
   const boardLabel = board.mock || connection.mock ? 'MOCK' : (board.portId ?? 'board');
 
-  const onCommissionPreset = (slug: string) =>
-    send({ type: 'cmd.commission', id: newCommandId(), payload: { preset_slug: slug } });
+  // The taught-device shelf: user-authored schemas from localStorage, merged
+  // into the commission menu. A custom slug commissions with its FULL inline
+  // spec (resolve_spec builds the BringupSpec server-side); built-ins keep
+  // sending {preset_slug}.
+  const [customSpecs, setCustomSpecs] = useState<CustomSpec[]>(loadCustomSpecs);
+
+  const presets = useMemo(
+    () => [
+      ...COMMISSION_PRESETS,
+      ...customSpecs.map((c) => ({
+        slug: c.slug,
+        label: c.display_name,
+        meta: specMeta(c),
+        custom: true,
+      })),
+    ],
+    [customSpecs],
+  );
+
+  const commissionSpec = (spec: CustomSpec) =>
+    send({ type: 'cmd.commission', id: newCommandId(), payload: toCommissionPayload(spec) });
+
+  const onCommissionPreset = (slug: string) => {
+    const custom = customSpecs.find((c) => c.slug === slug);
+    if (custom) commissionSpec(custom);
+    else send({ type: 'cmd.commission', id: newCommandId(), payload: { preset_slug: slug } });
+  };
+
+  const onTeach = (spec: CustomSpec) => setCustomSpecs(saveCustomSpec(spec));
+  const onTeachAndCommission = (spec: CustomSpec) => {
+    setCustomSpecs(saveCustomSpec(spec));
+    commissionSpec(spec);
+  };
+  const onRemoveCustom = (slug: string) => setCustomSpecs(removeCustomSpec(slug));
 
   const onSendChat = (text: string) => {
     useStore.setState((s) => ({
@@ -83,9 +123,13 @@ export default function Console() {
           senses={driverCards.length}
           busySlug={running ? active.slug : undefined}
           lastError={connection.lastError}
-          presets={COMMISSION_PRESETS}
+          presets={presets}
+          customSpecs={customSpecs}
           busy={board.busy || running}
           onCommission={onCommissionPreset}
+          onTeach={onTeach}
+          onTeachAndCommission={onTeachAndCommission}
+          onRemoveCustom={onRemoveCustom}
         />
       </div>
 

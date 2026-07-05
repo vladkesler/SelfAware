@@ -11,14 +11,18 @@
 export interface CommissionPreset {
   slug: string;
   label: string;
+  /** One-glance schema facts: `class · pins · unit` (mirrors default_specs()). */
+  meta: string;
+  /** True for user-taught schemas (localStorage), absent for built-ins. */
+  custom?: boolean;
 }
 
 export const COMMISSION_PRESETS: CommissionPreset[] = [
-  { slug: 'servo', label: 'Servo (SG90)' },
-  { slug: 'buzzer', label: 'Buzzer' },
-  { slug: 'fan', label: 'Fan (DC motor)' },
-  { slug: 'ldr', label: 'Light (LDR)' },
-  { slug: 'pot', label: 'Potentiometer' },
-  { slug: 'shtc3', label: 'SHTC3 temp/hum' },
-  { slug: 'ultrasonic', label: 'Ultrasonic' },
+  { slug: 'servo', label: 'Servo (SG90)', meta: 'output · i2c 0x22 · GP4/5' },
+  { slug: 'buzzer', label: 'Buzzer', meta: 'output · pwm GP20' },
+  { slug: 'fan', label: 'Fan (DC motor)', meta: 'output · i2c 0x22 · GP4/5' },
+  { slug: 'ldr', label: 'Light (LDR)', meta: 'analog · GP27 · %' },
+  { slug: 'pot', label: 'Potentiometer', meta: 'analog · GP26 · %' },
+  { slug: 'shtc3', label: 'SHTC3 temp/hum', meta: 'digital_bus · i2c 0x70 · degC' },
+  { slug: 'ultrasonic', label: 'Ultrasonic', meta: 'pulse_timing · GP14/15 · cm' },
 ];

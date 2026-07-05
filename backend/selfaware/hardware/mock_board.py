@@ -207,6 +207,13 @@ def _default_simulators() -> list[SimulatedSensor]:
     return [
         SimulatedSensor(slug="ldr", pattern=re.compile(r"ADC\(\s*27\s*\)"), base=55.0, amplitude=25.0, noise=2.0),
         SimulatedSensor(slug="pot", pattern=re.compile(r"ADC\(\s*26\s*\)"), base=50.0, amplitude=35.0, period_s=9.0, noise=2.0),
+        # The "taught device" channel: GP28 is the one ADC-capable pin no preset
+        # claims (26=pot, 27=ldr), so any user-taught analog spec lands here and
+        # reads live offline. Emits the FINAL display-unit reading (a %, per the
+        # extra_context normalization convention); 47±9±noise stays well inside a
+        # 0..100 window and clear of the plausibility rail margin. Slug "soil"
+        # matches the demo schema so cmd.stimulate("soil", …) nudges it.
+        SimulatedSensor(slug="soil", pattern=re.compile(r"ADC\(\s*28\s*\)"), base=47.0, amplitude=9.0, period_s=8.0, noise=1.2),
         SimulatedSensor(
             slug="shtc3",
             pattern=re.compile(r"0x70|(?<!\d)112(?!\d)"),

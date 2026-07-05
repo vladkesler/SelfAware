@@ -201,6 +201,224 @@
   cursor: not-allowed;
 }
 
+/* commission menu rows — two lines: the part's name over its schema facts */
+.cmd-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cmd-item__name {
+  color: inherit;
+}
+.cmd-item__meta {
+  font-size: var(--fs-micro);
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+}
+/* taught-by-you section: a quiet charge dot marks the human-declared schemas */
+.cmd-taught-label {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--unit) * 1.5);
+  margin-top: calc(var(--unit) * 1.5);
+  border-top: 1px solid var(--line);
+  padding-top: calc(var(--unit) * 2);
+}
+.cmd-taught-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--charge);
+}
+.cmd-item-row {
+  position: relative;
+  display: flex;
+}
+.cmd-item-row .cmd-item {
+  flex: 1;
+  min-width: 0;
+}
+.cmd-item-x {
+  position: absolute;
+  top: calc(var(--unit) * 1.25);
+  right: calc(var(--unit) * 1);
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: var(--fs-meta);
+  line-height: 1;
+  padding: calc(var(--unit) * 0.5) calc(var(--unit) * 1);
+  border-radius: var(--radius);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 100ms var(--ease-snap);
+}
+.cmd-item-row:hover .cmd-item-x {
+  opacity: 1;
+}
+.cmd-item-x:hover {
+  color: var(--alert);
+}
+
+/* teach-device popover — the schema form; reuses the .fascia__cmd shell */
+.teach__menu {
+  min-width: 440px;
+  max-height: 76vh;
+  overflow-y: auto;
+  gap: calc(var(--unit) * 2);
+}
+.teach__import {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--unit) * 1.5);
+}
+.teach__import-btns {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 1.5);
+}
+.teach__import-btns .btn {
+  white-space: nowrap;
+}
+.teach__paste {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+  font-family: var(--font-machine);
+  font-size: var(--fs-micro);
+}
+.teach__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(var(--unit) * 1.5);
+}
+.teach__grid--three {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.teach__field {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 1);
+  min-width: 0;
+}
+.teach__key {
+  font-size: var(--fs-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+.teach__select {
+  appearance: none;
+  cursor: pointer;
+}
+.teach__pins {
+  display: flex;
+  gap: calc(var(--unit) * 1.5);
+}
+.teach__pin {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--unit) * 1);
+  background: var(--bg-void);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-family: var(--font-machine);
+  font-size: var(--fs-meta);
+  padding: calc(var(--unit) * 1) calc(var(--unit) * 2.5);
+  cursor: pointer;
+  transition:
+    border-color 100ms var(--ease-snap),
+    color 100ms var(--ease-snap);
+}
+.teach__pin[data-on] {
+  color: var(--ion);
+  border-color: var(--ion-dim);
+  background: var(--ion-tint);
+}
+.teach__pin-note {
+  font-size: var(--fs-micro);
+  color: var(--text-faint);
+}
+.teach__context {
+  resize: vertical;
+  font-family: var(--font-machine);
+  line-height: 1.5;
+}
+.teach__hint {
+  font-size: var(--fs-micro);
+  color: var(--text-faint);
+}
+.teach__errors {
+  margin: 0;
+  padding-left: calc(var(--unit) * 4);
+  color: var(--alert);
+  font-size: var(--fs-micro);
+  line-height: 1.6;
+}
+.teach__imported {
+  color: var(--live);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.04em;
+  animation: fade-in var(--act-ms) var(--ease-snap);
+}
+.teach__actions {
+  display: flex;
+  gap: calc(var(--unit) * 2);
+}
+.teach__shelf {
+  border-top: 1px solid var(--line);
+  padding-top: calc(var(--unit) * 1.5);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 1);
+}
+.teach__taught-row {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--unit) * 2);
+  padding: calc(var(--unit) * 1) calc(var(--unit) * 1.5);
+  border-radius: var(--radius);
+}
+.teach__taught-row:hover {
+  background: var(--bg-raised);
+}
+.teach__taught-name {
+  font-family: var(--font-machine);
+  font-size: var(--fs-meta);
+  color: var(--text);
+}
+.teach__taught-meta {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-micro);
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.teach__taught-btn {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-family: var(--font-machine);
+  font-size: var(--fs-micro);
+  cursor: pointer;
+  padding: 0 calc(var(--unit) * 1);
+}
+.teach__taught-btn:hover {
+  color: var(--ion);
+}
+.teach__taught-btn--x:hover {
+  color: var(--alert);
+}
+.teach__taught-json {
+  margin: 0 calc(var(--unit) * 1.5) calc(var(--unit) * 1);
+  font-size: var(--fs-micro);
+  max-height: 200px;
+  overflow: auto;
+}
+
 /* connect-agent popover — reuses .fascia__cmd shell, wider body */
 .connect__menu {
   min-width: 360px;

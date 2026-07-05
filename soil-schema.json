@@ -1,0 +1,11 @@
+{
+  "slug": "soil",
+  "display_name": "Soil moisture",
+  "protocol_class": "analog",
+  "pins": { "adc": 28 },
+  "expected_min": 0,
+  "expected_max": 100,
+  "unit": "%",
+  "stimulus_hint": "pinch the probe between wet fingers",
+  "extra_context": "Capacitive soil moisture probe, analog OUT wired to GP28 (the free ADC — 26 is the pot, 27 is the LDR). Report moisture as a percentage 0..100 of full scale: average 8 raw u16 reads from machine.ADC(28).read_u16() and return round(raw * 100 / 65535, 1). Plain RP2040 MicroPython only — no ESP32 APIs like .atten() or .width()."
+}
