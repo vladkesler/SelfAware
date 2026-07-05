@@ -49,3 +49,14 @@ export interface ChatMessage {
   text: string;
   at: string;
 }
+
+/** A copilot tool invocation: agent.tool_call, patched by agent.tool_result. */
+export interface ChatToolEntry {
+  id: string; // tool_call_id
+  tool: string;
+  args: Record<string, unknown>;
+  at: string;
+  /** Undefined while the call is in flight. */
+  ok?: boolean;
+  preview?: string;
+}

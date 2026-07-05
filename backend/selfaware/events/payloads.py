@@ -5,7 +5,7 @@ Mirrored by hand in `frontend/src/types/events.ts`, documented in
 
 Conventions (post design-critique, canonical):
   * commission.* payloads all carry commission_id for client-side correlation.
-  * agent.* payloads all carry `agent` ("driver_author" | "copilot").
+  * agent.* payloads all carry `agent` — an AgentId value ("author"|"medic"|"pilot").
   * traceback fields are VERBATIM board stderr — never trimmed or re-wrapped.
   * driver.* payloads are FLAT (no nested DriverSummary in the event itself;
     the summary model is used in system.hello's rehydration list).
@@ -54,6 +54,7 @@ class HelloPayload(BaseModel):
 
     server_version: str
     protocol_v: int
+    model: str = ""  # the provider:model the agents run on, surfaced in the fascia
     board: BoardStatusPayload
     drivers: list[DriverSummary]
 
@@ -101,6 +102,13 @@ class CommissionStagePayload(BaseModel):
     detail: str = ""
 
 
+class CommissionCodePayload(BaseModel):
+    commission_id: str
+    attempt: int
+    code: str  # full generated MicroPython source, verbatim, pre-gate
+    is_repair: bool = False  # True when regenerated with the previous verbatim error in hand
+
+
 class CommissionTracebackPayload(BaseModel):
     commission_id: str
     attempt: int
@@ -128,7 +136,7 @@ class CommissionFailedPayload(BaseModel):
 
 
 class AgentThoughtPayload(BaseModel):
-    agent: str  # "driver_author" | "copilot"
+    agent: str  # AgentId: "author" | "medic" | "pilot"
     text: str
 
 

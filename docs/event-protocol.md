@@ -49,7 +49,7 @@ never kills the socket.
 
 | Type | Payload | Notes |
 |---|---|---|
-| `system.hello` | `{server_version, protocol_v, board: BoardStatus, drivers: DriverSummary[]}` | First frame on every connection |
+| `system.hello` | `{server_version, protocol_v, model, board: BoardStatus, drivers: DriverSummary[]}` | First frame on every connection; `model` is the `provider:model` the agents run on (surfaced in the fascia) |
 | `system.ack` | `{cmd_id}` | |
 | `system.error` | `{code, message, cmd_id?, detail?}` | codes: `unknown_command`, `handler_error`, `model_unavailable`, `board_offline`, `mock_only`, ... |
 | `board.connected` | `{port_id, mock}` | |
@@ -57,10 +57,11 @@ never kills the socket.
 | `board.status` | `{connected, port_id, mock, busy}` | `busy` = a commission holds the exclusive lock |
 | `commission.started` | `{commission_id, slug, display_name, protocol_class, pins, max_attempts}` | |
 | `commission.stage` | `{commission_id, attempt, stage, status, detail}` | `stage ∈ generate\|validate\|deploy\|test\|repair`, `status ∈ started\|passed\|failed` |
+| `commission.code` | `{commission_id, attempt, code, is_repair}` | full generated driver source, verbatim, emitted after every generation — including attempts that later fail |
 | `commission.traceback` | `{commission_id, attempt, stage, traceback}` | **traceback is VERBATIM board stderr** — never trimmed, never re-wrapped |
 | `commission.passed` | `{commission_id, slug, attempts_used, reading?, unit}` | |
 | `commission.failed` | `{commission_id, slug, attempts_used, reason, last_traceback?}` | honest failure after the attempt budget |
-| `agent.thought` | `{agent, text}` | `agent ∈ driver_author\|copilot` |
+| `agent.thought` | `{agent, text}` | `agent ∈ author\|medic\|pilot` (the honest cast; author/medic are the driver LLM in generate/repair mode, pilot is the operator) |
 | `agent.tool_call` | `{agent, tool, args, tool_call_id}` | |
 | `agent.tool_result` | `{agent, tool, tool_call_id, ok, preview}` | preview truncated ~500 chars |
 | `agent.message` | `{agent, delta, done, usage?}` | streamed chat; client accumulates deltas |

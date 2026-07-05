@@ -12,8 +12,8 @@
  */
 
 import type { AnyEvent, DriverSummary } from '../types/events';
-import { isKnownEvent } from '../types/events';
-import type { DriverCard, PresenceCard, ReadingPoint, StageRecord } from '../types/domain';
+import { isKnownEvent, isCommissionAgent } from '../types/events';
+import type { ChatToolEntry, DriverCard, PresenceCard, ReadingPoint, StageRecord } from '../types/domain';
 import { RingBuffer } from '../lib/ring';
 import { READINGS_CAP } from './slices/readings';
 import { presenceKey } from './slices/drivers';
@@ -79,8 +79,35 @@ export function applyEvent(ev: AnyEvent, set: StoreSet, get: StoreGet): void {
     case 'system.ack':
       break; // feed row is the receipt; command tracking is build-day
 
-    case 'system.error':
-      break; // surfaced via the feed (RawEventRow); toast UX is build-day
+    case 'system.error': {
+      const p = ev.payload;
+      set((s) => {
+        const connection = {
+          ...s.connection,
+          lastError: { code: p.code, message: p.message, at: ev.ts },
+        };
+        // A crashed commission emits system.error, not commission.failed — the
+        // active run would otherwise hang mid-stage forever. Resolve it honestly.
+        const a = s.commission.active;
+        if (p.code === 'commission_crash' && a && !a.outcome) {
+          return {
+            connection,
+            commission: {
+              ...s.commission,
+              active: {
+                ...a,
+                outcome: 'failed',
+                stage: undefined,
+                stageStatus: undefined,
+                failReason: p.message,
+              },
+            },
+          };
+        }
+        return { connection };
+      });
+      break;
+    }
 
     case 'board.connected': {
       const p = ev.payload;
@@ -114,6 +141,10 @@ export function applyEvent(ev: AnyEvent, set: StoreSet, get: StoreGet): void {
             attempt: 1,
             maxAttempts: p.max_attempts,
             trail: [],
+            codeByAttempt: {},
+            thoughtsByAttempt: {},
+            toolsByAttempt: {},
+            tracebackByAttempt: {},
           },
         },
       }));
@@ -148,13 +179,41 @@ export function applyEvent(ev: AnyEvent, set: StoreSet, get: StoreGet): void {
       break;
     }
 
+    case 'commission.code': {
+      const p = ev.payload;
+      set((s) => {
+        const a = s.commission.active;
+        if (!a || a.id !== p.commission_id) return {};
+        return {
+          commission: {
+            ...s.commission,
+            active: {
+              ...a,
+              codeByAttempt: {
+                ...a.codeByAttempt,
+                [p.attempt]: { code: p.code, isRepair: p.is_repair },
+              },
+            },
+          },
+        };
+      });
+      break;
+    }
+
     case 'commission.traceback': {
       const p = ev.payload;
       set((s) => {
         const a = s.commission.active;
         if (!a || a.id !== p.commission_id) return {};
         return {
-          commission: { ...s.commission, active: { ...a, lastTraceback: p.traceback } },
+          commission: {
+            ...s.commission,
+            active: {
+              ...a,
+              lastTraceback: p.traceback,
+              tracebackByAttempt: { ...a.tracebackByAttempt, [p.attempt]: p.traceback },
+            },
+          },
         };
       });
       break;
@@ -169,7 +228,14 @@ export function applyEvent(ev: AnyEvent, set: StoreSet, get: StoreGet): void {
             // keep the finished trail on stage for the final tableau
             active:
               a && a.id === p.commission_id
-                ? { ...a, outcome: 'passed', stage: undefined, stageStatus: undefined }
+                ? {
+                    ...a,
+                    outcome: 'passed',
+                    stage: undefined,
+                    stageStatus: undefined,
+                    finalReading: p.reading,
+                    finalUnit: p.unit,
+                  }
                 : a,
             history: [
               ...s.commission.history,
@@ -194,6 +260,7 @@ export function applyEvent(ev: AnyEvent, set: StoreSet, get: StoreGet): void {
                     outcome: 'failed',
                     stage: undefined,
                     stageStatus: undefined,
+                    failReason: p.reason,
                     ...(p.last_traceback ? { lastTraceback: p.last_traceback } : {}),
                   }
                 : a,
@@ -207,10 +274,76 @@ export function applyEvent(ev: AnyEvent, set: StoreSet, get: StoreGet): void {
       break;
     }
 
-    case 'agent.thought':
-    case 'agent.tool_call':
-    case 'agent.tool_result':
-      break; // theater rows carry these; no accumulated state yet
+    case 'agent.thought': {
+      const p = ev.payload;
+      if (!isCommissionAgent(p.agent)) break; // PILOT thoughts stay feed-only
+      set((s) => {
+        const a = s.commission.active;
+        if (!a || a.outcome) return {};
+        const attempt = Math.max(a.attempt, 1);
+        return {
+          commission: {
+            ...s.commission,
+            active: {
+              ...a,
+              thoughtsByAttempt: {
+                ...a.thoughtsByAttempt,
+                [attempt]: [...(a.thoughtsByAttempt[attempt] ?? []), p.text],
+              },
+            },
+          },
+        };
+      });
+      break;
+    }
+
+    case 'agent.tool_call': {
+      const p = ev.payload;
+      const entry = { id: p.tool_call_id, tool: p.tool, args: p.args, at: ev.ts };
+      set((s) => {
+        // AUTHOR/MEDIC tools (e.g. dry_gate) belong to the running commission's
+        // active agent; PILOT tools are the chat ledger.
+        const a = s.commission.active;
+        if (isCommissionAgent(p.agent) && a && !a.outcome) {
+          const attempt = Math.max(a.attempt, 1);
+          return {
+            commission: {
+              ...s.commission,
+              active: {
+                ...a,
+                toolsByAttempt: {
+                  ...a.toolsByAttempt,
+                  [attempt]: [...(a.toolsByAttempt[attempt] ?? []), entry],
+                },
+              },
+            },
+          };
+        }
+        return { chat: { ...s.chat, tools: [...s.chat.tools, entry] } };
+      });
+      break;
+    }
+
+    case 'agent.tool_result': {
+      const p = ev.payload;
+      const patch = (t: ChatToolEntry): ChatToolEntry =>
+        t.id === p.tool_call_id ? { ...t, ok: p.ok, preview: p.preview } : t;
+      set((s) => {
+        const a = s.commission.active;
+        if (isCommissionAgent(p.agent) && a && !a.outcome) {
+          const attempt = Math.max(a.attempt, 1);
+          const cur = a.toolsByAttempt[attempt] ?? [];
+          return {
+            commission: {
+              ...s.commission,
+              active: { ...a, toolsByAttempt: { ...a.toolsByAttempt, [attempt]: cur.map(patch) } },
+            },
+          };
+        }
+        return { chat: { ...s.chat, tools: s.chat.tools.map(patch) } };
+      });
+      break;
+    }
 
     case 'agent.message': {
       const p = ev.payload;
@@ -219,6 +352,7 @@ export function applyEvent(ev: AnyEvent, set: StoreSet, get: StoreGet): void {
         if (p.done) {
           return {
             chat: {
+              ...s.chat,
               messages: [...s.chat.messages, { role: 'agent', text: acc, at: ev.ts }],
               streaming: undefined,
             },
@@ -368,5 +502,5 @@ export function applyEvent(ev: AnyEvent, set: StoreSet, get: StoreGet): void {
 
   // 3) Presentation pulse via the theater registry.
   const pulse = resolvePulse(ev.type);
-  if (pulse) firePulse(pulse);
+  if (pulse) firePulse(pulse.id, pulse.tone);
 }

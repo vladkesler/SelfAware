@@ -30,13 +30,15 @@ from selfaware.bringup.models import (
 from selfaware.config import Settings
 from selfaware.events.bus import EventBus
 from selfaware.events.payloads import (
+    AgentThoughtPayload,
+    CommissionCodePayload,
     CommissionFailedPayload,
     CommissionPassedPayload,
     CommissionStagePayload,
     CommissionStartedPayload,
     CommissionTracebackPayload,
 )
-from selfaware.events.types import DriverStatus, EventType
+from selfaware.events.types import AgentId, DriverStatus, EventType
 from selfaware.hardware.base import ExecResult
 from selfaware.hardware.session import BoardSession, ExclusiveBoard
 from selfaware.observability.otel import attempt_span, commission_span, stage_span
@@ -114,6 +116,25 @@ class CommissionRunner:
                     self._stage(commission_id, attempt, gen_stage, StageStatus.STARTED)
                     with stage_span(gen_stage.value, spec.slug, attempt):
                         gen = await self._generate(spec, attempt, last_error)
+                    # The agent's own words + code, on the wire BEFORE the gate:
+                    # every attempt is shown, including the ones that later fail.
+                    # AUTHOR writes the first draft; MEDIC repairs from the board's
+                    # verbatim traceback — same LLM, two honestly-distinct roles.
+                    agent_id = AgentId.AUTHOR if gen_stage is CommissionStage.GENERATE else AgentId.MEDIC
+                    if gen.reasoning:
+                        self._bus.publish(
+                            EventType.AGENT_THOUGHT,
+                            AgentThoughtPayload(agent=agent_id, text=gen.reasoning),
+                        )
+                    self._bus.publish(
+                        EventType.COMMISSION_CODE,
+                        CommissionCodePayload(
+                            commission_id=commission_id,
+                            attempt=attempt,
+                            code=gen.driver_code,
+                            is_repair=last_error is not None,
+                        ),
+                    )
                     self._stage(commission_id, attempt, gen_stage, StageStatus.PASSED)
 
                     # -- validate: the static AST gate ---------------------------------

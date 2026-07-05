@@ -20,8 +20,8 @@ infra-up: ## start redis + agent-memory-server + grafana otel-lgtm
 infra-down: ## stop infra containers
 	$(COMPOSE) down
 
-dev-backend: ## run FastAPI with reload on :8000
-	cd backend && uv run uvicorn selfaware.api.app:create_app --factory --reload --port 8000
+dev-backend: ## run FastAPI with reload on :8000 (auto-loads repo-root .env if present)
+	cd backend && uv run $(if $(wildcard .env),--env-file $(CURDIR)/.env,) uvicorn selfaware.api.app:create_app --factory --reload --port 8000
 
 dev-frontend: ## run Vite dev server on :5173
 	cd frontend && npm run dev

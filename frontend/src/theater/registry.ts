@@ -1,46 +1,34 @@
 /**
- * Theater registry — THE event→presentation seam. For each event type:
- *   Row    how the event appears in the play-by-play feed (omit → RawEventRow)
- *   pulse  which panel's chrome flashes when it lands (fired from dispatch)
- *
- * Adding a new event on build day = one entry here + one case in dispatch.ts.
+ * Theater registry — THE event→presentation seam, now pulse-only: for each
+ * event type, which panel's chrome flashes and in which semantic tone.
+ * (Feed rendering lives in EventFeed + narrate.ts — every known event
+ * narrates; unknown types fall back to a raw row there.)
  */
 
-import type { ComponentType } from 'react';
-import type { AnyEvent, EventOf, EventType } from '../types/events';
+import type { EventType } from '../types/events';
 import type { PanelId } from '../types/domain';
-import { RawEventRow } from './rows/RawEventRow';
-import { CommissionRow } from './rows/CommissionRow';
-import { TracebackRow } from './rows/TracebackRow';
-import { AgentThoughtRow } from './rows/AgentThoughtRow';
-import { ToolCallRow } from './rows/ToolCallRow';
-import { ReadingRow } from './rows/ReadingRow';
+import type { PulseTone } from './pulse';
 
-export type RowComponent = ComponentType<{ event: AnyEvent }>;
-
-export interface RegistryEntry<T extends EventType = EventType> {
-  Row?: ComponentType<{ event: EventOf<T> }>;
+export interface RegistryEntry {
   pulse?: PanelId;
+  /** Semantic tone of the pulse; defaults to phosphor. */
+  pulseTone?: PulseTone;
 }
 
-export const registry: { [T in EventType]?: RegistryEntry<T> } = {
-  'commission.stage': { Row: CommissionRow, pulse: 'stepper' },
-  'commission.traceback': { Row: TracebackRow, pulse: 'terminal' },
-  'agent.thought': { Row: AgentThoughtRow },
-  'agent.tool_call': { Row: ToolCallRow },
-  'sensor.reading': { Row: ReadingRow, pulse: 'scope' },
+export const registry: Partial<Record<EventType, RegistryEntry>> = {
+  'commission.stage': { pulse: 'stepper' },
+  'commission.code': { pulse: 'stepper' },
+  'commission.traceback': { pulse: 'terminal', pulseTone: 'alert' },
+  'commission.passed': { pulse: 'stepper' },
+  'commission.failed': { pulse: 'stepper', pulseTone: 'alert' },
+  // sensor.reading: deliberately NO pulse — the moving trace IS the life signal.
   'driver.registered': { pulse: 'rail' },
   'discovery.device_found': { pulse: 'rail' },
-  // Build day fills the rest; anything absent → RawEventRow, no pulse.
 };
 
-/** Feed row for an event type; unknown/unmapped types fall back to RawEventRow. */
-export function resolveRow(type: string): RowComponent {
+/** Pulse target + tone for an event type, if any. */
+export function resolvePulse(type: string): { id: PanelId; tone: PulseTone } | undefined {
   const entry = (registry as Record<string, RegistryEntry | undefined>)[type];
-  return (entry?.Row ?? RawEventRow) as RowComponent;
-}
-
-/** Pulse target for an event type, if any. */
-export function resolvePulse(type: string): PanelId | undefined {
-  return (registry as Record<string, RegistryEntry | undefined>)[type]?.pulse;
+  if (!entry?.pulse) return undefined;
+  return { id: entry.pulse, tone: entry.pulseTone ?? 'phosphor' };
 }

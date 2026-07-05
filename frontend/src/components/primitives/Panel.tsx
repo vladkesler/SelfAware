@@ -19,12 +19,12 @@ export interface PanelProps {
 }
 
 export function Panel({ id, title, status, actions, className, children }: PanelProps) {
-  const pulsing = usePanelPulse(id);
+  const pulseTone = usePanelPulse(id);
   return (
     <section
       className={`panel${className ? ` ${className}` : ''}`}
       data-panel={id}
-      data-pulse={pulsing || undefined}
+      data-pulse={pulseTone ?? undefined}
     >
       <header className="panel__bar">
         {status ? <StatusDot state={status} /> : null}

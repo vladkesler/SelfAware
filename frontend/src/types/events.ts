@@ -15,6 +15,25 @@ export type StageStatus = 'started' | 'passed' | 'failed';
 export type ProtocolClass = 'analog' | 'digital_bus' | 'pulse_timing' | 'output';
 export type DriverStatus = 'commissioning' | 'active' | 'failed';
 
+/**
+ * The honest cast on the wire (mirror of backend AgentId). AUTHOR + MEDIC are
+ * the driver LLM in generate/repair mode; PILOT operates admitted drivers as
+ * tools. `normalizeAgent` folds legacy fixture strings (driver_author→author,
+ * copilot→pilot) so old recordings still play.
+ */
+export type AgentId = 'author' | 'medic' | 'pilot';
+
+export function normalizeAgent(a: string): AgentId {
+  if (a === 'medic') return 'medic';
+  if (a === 'pilot' || a === 'copilot') return 'pilot';
+  return 'author'; // 'author' and legacy 'driver_author'
+}
+
+/** Agents that participate in a commission (their thoughts/tools join the trail). */
+export function isCommissionAgent(a: string): boolean {
+  return normalizeAgent(a) !== 'pilot';
+}
+
 /** Server→client envelope, generic over the dot-namespaced type + payload. */
 interface Env<T extends string, P> {
   v: 1;
@@ -47,6 +66,8 @@ export interface DriverSummary {
 export interface SystemHello {
   server_version: string;
   protocol_v: number;
+  /** The model the agents run on, e.g. "anthropic:claude-sonnet-5" (optional). */
+  model?: string;
   board: BoardStatusP;
   drivers: DriverSummary[];
 }
@@ -82,6 +103,14 @@ export interface CommissionStage {
   stage: Stage;
   status: StageStatus;
   detail: string;
+}
+export interface CommissionCode {
+  commission_id: string;
+  attempt: number;
+  /** Full generated MicroPython source, VERBATIM, pre-gate — every attempt. */
+  code: string;
+  /** True when regenerated with the previous verbatim error in hand. */
+  is_repair: boolean;
 }
 export interface CommissionTraceback {
   commission_id: string;
@@ -187,6 +216,7 @@ export type ServerEvent =
   | Env<'board.status', BoardStatusP>
   | Env<'commission.started', CommissionStarted>
   | Env<'commission.stage', CommissionStage>
+  | Env<'commission.code', CommissionCode>
   | Env<'commission.traceback', CommissionTraceback>
   | Env<'commission.passed', CommissionPassed>
   | Env<'commission.failed', CommissionFailed>
@@ -214,6 +244,7 @@ export const KNOWN_EVENT_TYPES: readonly EventType[] = [
   'board.status',
   'commission.started',
   'commission.stage',
+  'commission.code',
   'commission.traceback',
   'commission.passed',
   'commission.failed',

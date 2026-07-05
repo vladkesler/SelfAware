@@ -52,6 +52,23 @@ async def test_demo_script_yields_verbatim_traceback_then_reading() -> None:
     assert 600 < value < 64935  # plausible AND not railed — passes the analog judge
 
 
+async def test_persistent_scan_responder_answers_every_scan_without_touching_the_script() -> None:
+    """`.scan()` execs are answered from scan_addrs EVERY time, never from the
+    script queue — so discovery cards appear before the commission and cannot
+    vanish when the script runs out (the cards-vanishing-on-stage bug)."""
+    board = MockBoard(script=[ScriptedExchange(stdout="beat\n")], scan_addrs=[0x3C, 0x70])
+    scan_code = "from machine import I2C, Pin\nprint(I2C(0, sda=Pin(4), scl=Pin(5)).scan())\n"
+
+    first = await board.exec(scan_code, timeout_s=1.0)
+    second = await board.exec(scan_code, timeout_s=1.0)
+    assert first.last_line == "[60, 112]"  # 0x3C OLED, 0x70 SHTC3
+    assert second.last_line == "[60, 112]"  # persistent — never exhausted
+
+    # the scripted beat is still intact: scans never consume the queue
+    beat = await board.exec("Driver().read()", timeout_s=1.0)
+    assert beat.last_line == "beat"
+
+
 async def test_timeout_contract_flags_timed_out(mock_board: MockBoard) -> None:
     mock_board.queue(ScriptedExchange(stdout="too slow\n", delay_s=0.2))
     result = await mock_board.exec("anything", timeout_s=0.01)

@@ -114,6 +114,40 @@ async def test_loop_converges_in_three(
     assert tracebacks[0].payload["traceback"] == BOARD_TRACEBACK  # never trimmed
     assert tracebacks[0].payload["attempt"] == 2
 
+    # -- the agent's actual work is on the wire ----------------------------------
+    thoughts = [e for e in bus_spy.events if e.type == "agent.thought"]
+    # AUTHOR writes attempt 1 (generate); MEDIC repairs attempts 2-3 (repair).
+    assert [t.payload["agent"] for t in thoughts] == ["author", "medic", "medic"]
+    assert [t.payload["text"] for t in thoughts] == ["attempt 1", "attempt 2", "attempt 3"]
+
+    codes = [e for e in bus_spy.events if e.type == "commission.code"]
+    assert [c.payload["attempt"] for c in codes] == [1, 2, 3]  # once per attempt
+    assert [c.payload["is_repair"] for c in codes] == [False, True, True]
+    assert codes[0].payload["code"] == WHILE_LOOP_CODE  # verbatim, pre-gate
+    assert codes[1].payload["code"] == GOOD_CODE
+    assert codes[2].payload["code"] == GOOD_CODE
+    assert all(c.payload["commission_id"] == "c-1" for c in codes)
+
+    # per-attempt wire order: stage(gen, started) -> agent.thought ->
+    # commission.code -> stage(gen, passed) -> validate...
+    def _stage_seq(attempt: int, stage: str, status: str) -> int:
+        return next(
+            e.seq
+            for e in bus_spy.events
+            if e.type == "commission.stage"
+            and e.payload["attempt"] == attempt
+            and e.payload["stage"] == stage
+            and e.payload["status"] == status
+        )
+
+    assert (
+        _stage_seq(1, "generate", "started")
+        < thoughts[0].seq
+        < codes[0].seq
+        < _stage_seq(1, "generate", "passed")
+        < _stage_seq(1, "validate", "started")
+    )
+
     stages = [
         (e.payload["attempt"], e.payload["stage"], e.payload["status"])
         for e in bus_spy.events
@@ -158,3 +192,10 @@ async def test_budget_exhaustion_is_an_honest_failure(
     assert len(failed) == 1
     assert failed[0].payload["attempts_used"] == settings.max_attempts
     assert mock_board.soft_reset_count >= 1  # clean line after the honest FAILED
+
+    # every attempt's code hit the wire — including the ones that failed the gate
+    codes = bus_spy.of_type("commission.code")
+    assert len(codes) == settings.max_attempts
+    assert [c.payload["attempt"] for c in codes] == list(range(1, settings.max_attempts + 1))
+    assert codes[0].payload["is_repair"] is False
+    assert all(c.payload["is_repair"] for c in codes[1:])

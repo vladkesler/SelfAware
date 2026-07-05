@@ -13,6 +13,8 @@ export interface ConnectionSlice {
   server?: SystemHello | undefined;
   /** Frames dropped by parseServerEvent (malformed JSON / bad envelope). */
   parseErrors: number;
+  /** Last system.error, surfaced in the status-strip banner (auto-dismissed). */
+  lastError?: { code: string; message: string; at: string } | undefined;
 }
 
 export function initialConnection(): ConnectionSlice {

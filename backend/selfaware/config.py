@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     # --- explicit mocks (NEVER silent fallbacks) ------------------------------
     mock_board: bool = False  # True => MockBoard everywhere; board absent otherwise = honest disconnected
     mock_author: bool = False  # True => canned DriverGenOutput sequence; full demo runs keyless
+    mock_pace_s: float = 1.5  # theatrical pacing for mock author/board; 0 in tests
 
     # --- board / serial -------------------------------------------------------
     board_port: str = "auto"  # "auto" -> discovery.find_board_port(serial_port_glob); else a literal port id

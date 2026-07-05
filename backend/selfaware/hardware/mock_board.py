@@ -1,11 +1,16 @@
 """MockBoard — the demo-without-hardware engine. FULLY WORKING today.
 
-Two modes, composable, checked in this order per exec:
+Three modes, composable, checked in this order per exec:
 
-  1. Scripted: a queue of ScriptedExchange consumed per exec — this is how the
+  1. Persistent I2C scan responder (opt-in via `scan_addrs`): any exec of the
+     host's I2C scan snippet gets the canned address list — every time, never
+     consuming the script. Discovery cards therefore appear on the FIRST
+     watcher tick and never vanish mid-demo (an exhausted script used to diff
+     to an empty scan -> device_lost).
+  2. Scripted: a queue of ScriptedExchange consumed per exec — this is how the
      fail -> repair -> pass demo runs offline (attempt 1 returns a genuine-
      looking board traceback, attempt 2 a plausible reading).
-  2. Simulated sensors: when no script entry claims the exec, regexes over the
+  3. Simulated sensors: when no script entry claims the exec, regexes over the
      exec'd CODE select a value generator (sine + noise per slug), so
      sensor.reading streams look alive and `stimulate(slug, delta)` can nudge
      a baseline for the liveness beat.
@@ -68,11 +73,18 @@ class SimulatedSensor:
 class MockBoard:
     """Implements BoardTransport with zero hardware. See module docstring."""
 
-    def __init__(self, script: list[ScriptedExchange] | None = None) -> None:
+    def __init__(
+        self,
+        script: list[ScriptedExchange] | None = None,
+        scan_addrs: list[int] | None = None,
+    ) -> None:
         self.port_id = MOCK_PORT_ID
         self.is_mock = True
         self._connected = False
         self._script: deque[ScriptedExchange] = deque(script or [])
+        # Persistent I2C presences: answered to EVERY `.scan()` exec, before the
+        # script queue and without consuming it (None = no responder, as before).
+        self._scan_addrs: list[int] | None = list(scan_addrs) if scan_addrs is not None else None
         self._sims: list[SimulatedSensor] = _default_simulators()
         self.exec_log: list[str] = []  # every exec'd payload, for tests/inspection
         self.soft_reset_count = 0
@@ -87,7 +99,8 @@ class MockBoard:
         self._connected = True
 
     async def exec(self, code: str, timeout_s: float) -> ExecResult:
-        """Scripted head first, then simulators, then a silent success.
+        """Scan responder first, then scripted head, then simulators, then a
+        silent success.
 
         Honors the host-timeout contract for real: an exchange whose delay_s
         exceeds timeout_s returns ExecResult(timed_out=True) after timeout_s —
@@ -95,6 +108,17 @@ class MockBoard:
         """
         started = time.monotonic()
         self.exec_log.append(code)
+
+        # Persistent scan responder: an I2C scan (host-authored snippet, see
+        # hardware/discovery.I2C_SCAN_SNIPPET) NEVER touches the script queue —
+        # the queue serves only the commission execs, so discovery cards cannot
+        # eat a demo beat or vanish when the script runs out.
+        if self._scan_addrs is not None and ".scan()" in code:
+            return ExecResult(
+                stdout=f"{self._scan_addrs}\n",
+                stderr="",
+                duration_s=time.monotonic() - started,
+            )
 
         exchange = self._claim_scripted(code)
         if exchange is not None:
@@ -180,7 +204,7 @@ def _default_simulators() -> list[SimulatedSensor]:
     ]
 
 
-def demo_fail_then_pass_script(slug: str = "ldr") -> list[ScriptedExchange]:
+def demo_fail_then_pass_script(slug: str = "ldr", delay_s: float = 0.15) -> list[ScriptedExchange]:
     """The rehearsable demo arc: gate-passing code, board-raised failure, recovery.
 
     Attempt 1: the exec'd driver passed the static gate, but the *board*
@@ -190,7 +214,8 @@ def demo_fail_then_pass_script(slug: str = "ldr") -> list[ScriptedExchange]:
     signal the repair prompt embeds untouched. Attempt 2: a plausible,
     non-railed reading, so plausibility passes and the driver registers.
 
-    Theatrical delay_s so the UI stepper animates believably.
+    delay_s is the theatrical per-exec latency so the UI stepper animates
+    believably; the app factory passes settings.mock_pace_s (0 in tests).
     """
     return [
         ScriptedExchange(
@@ -202,11 +227,11 @@ def demo_fail_then_pass_script(slug: str = "ldr") -> list[ScriptedExchange]:
                 '  File "<stdin>", line 11, in read\n'
                 "AttributeError: 'ADC' object has no attribute 'read'\n"
             ),
-            delay_s=0.15,
+            delay_s=delay_s,
         ),
         ScriptedExchange(
             match=None,
             stdout="41250\n",
-            delay_s=0.15,
+            delay_s=delay_s,
         ),
     ]

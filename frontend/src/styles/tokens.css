@@ -1,35 +1,77 @@
 /**
- * Design tokens — a dark instrument in a quiet room, not a SaaS dashboard.
- * Three surface steps, hairlines instead of shadows, ONE phosphor accent,
- * one RESERVED alert red (tracebacks + failure states, nothing else).
- * The build-day craft pass works directly against this file.
+ * SelfAware tokens — a dark instrument in a quiet room.
+ *
+ * 60/30/10: near-black structure / grayscale voice / color only where it
+ * MEANS something. Three semantics, strictly scoped:
+ *   phosphor — alive · verified · live signal (the only success color)
+ *   charge   — current in flight, verdict pending (running ≠ succeeded)
+ *   alert    — RESERVED: the board's verbatim voice + failure states
+ * Nothing else on this screen gets color.
  */
-
 :root {
-  /* surfaces — near-black, warm-neutral, three steps only */
-  --bg-void: #0a0b0d;
-  --bg-panel: #101216;
-  --bg-raised: #161a20;
-  --line: rgb(255 255 255 / 0.07); /* hairline borders, never shadows */
+  color-scheme: dark;
 
-  /* one phosphor accent (green CRT) + one reserved alert */
+  /* surfaces — one hue, lightness only, four steps */
+  --bg-void: #08090b; /* the room */
+  --bg-panel: #0e1013; /* instrument face */
+  --bg-raised: #14171c; /* cards, chips */
+  --bg-overlay: #1a1e24; /* code wells, expanded rows, the stamp plate */
+
+  /* hairlines — never shadows */
+  --line: rgb(255 255 255 / 0.06);
+  --line-strong: rgb(255 255 255 / 0.12);
+
+  /* text — four tiers */
+  --text-bright: #f4f7fa; /* hero numbers, verdicts */
+  --text: #d7dce3; /* primary */
+  --text-dim: #8b95a1; /* labels, meta */
+  --text-faint: #59616b; /* decorative chrome only, never load-bearing */
+  --text-muted: var(--text-dim); /* legacy alias */
+
+  /* phosphor — THE accent */
   --phosphor: #3dffa0;
-  --phosphor-dim: #1e7a52;
-  --phosphor-glow: rgb(61 255 160 / 0.35); /* text-shadow / box-shadow only */
-  --alert: #ff5c5c; /* RESERVED: verbatim tracebacks + failure states */
+  --phosphor-dim: #1fa368;
+  --phosphor-glow: rgb(61 255 160 / 0.35);
+  --phosphor-tint: rgb(61 255 160 / 0.07);
 
-  --text: #e7eaee;
-  --text-muted: #7c8591;
+  /* charge — in flight, not yet judged */
+  --charge: #f0b445;
+  --charge-dim: #8a6a2a;
+  --charge-glow: rgb(240 180 69 / 0.3);
+
+  /* alert — reserved */
+  --alert: #ff5f56;
+  --alert-dim: #8f3b36;
+  --alert-glow: rgb(255 95 86 / 0.3);
+  --alert-tint: rgb(255 95 86 / 0.08);
 
   /* two voices */
-  --font-machine: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-  --font-voice: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-machine:
+    'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-voice: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
 
-  /* motion — events arrive as pulses; stages ignite; only the scope idles */
-  --pulse-ms: 180ms; /* arrival flash on panel chrome */
-  --stage-ms: 320ms; /* stepper stage transitions */
-  --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
+  /* type — projector-first (~1.25 off 15px); nothing load-bearing < 13px */
+  --fs-micro: 12px; /* tracked-caps panel titles, lane tags only */
+  --fs-meta: 13px; /* timestamps, attempt counters, card meta */
+  --fs-mono: 14px; /* code, log lines, terminal */
+  --fs-body: 15px; /* chat, prose, card titles */
+  --fs-emph: 18px; /* act titles, verdict copy */
+  --fs-head: 22px; /* rail live readings, gate verdict */
+  --fs-display: 30px; /* stamp lettering, empty states */
+  --fs-hero: 56px; /* THE reading — tabular-nums */
 
+  /* spacing & shape — workbench-tight */
   --unit: 4px;
-  --radius: 4px; /* tight radii; instruments, not bubbles */
+  --pad-panel: 12px;
+  --radius: 4px;
+  --radius-lg: 8px;
+
+  /* motion — events pulse, current flows, the stamp lands once */
+  --pulse-ms: 180ms; /* arrival flash on panel chrome */
+  --stage-ms: 380ms; /* relay/circuit node transitions — gentle, never a snap */
+  --act-ms: 420ms; /* act enter / attempt collapse / stage cross-fade */
+  --stamp-ms: 640ms; /* the admission thunk */
+  --flow-s: 1.6s; /* dash-march period on live traces */
+  --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
 }

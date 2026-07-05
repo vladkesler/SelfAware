@@ -27,31 +27,42 @@ export const useProtocolMismatch = (): boolean =>
  * TracebackPane lines from the commission story: one meta line per stage
  * beat, with the VERBATIM traceback spliced in after the failing beat
  * (or appended while the failure beat is still in flight).
+ *
+ * With `attempt` set, the story is scoped to that attempt only (per-attempt
+ * BoardActs in the dossier) and the traceback comes from tracebackByAttempt.
  */
-export function buildTermLines(active: ActiveCommission | undefined): TermLine[] {
+export function buildTermLines(
+  active: ActiveCommission | undefined,
+  attempt?: number,
+): TermLine[] {
   if (!active) return [];
   const lines: TermLine[] = [];
 
+  const trail =
+    attempt === undefined ? active.trail : active.trail.filter((r) => r.attempt === attempt);
+  const traceback =
+    attempt === undefined ? active.lastTraceback : active.tracebackByAttempt[attempt];
+
   let lastFailedIdx = -1;
-  active.trail.forEach((r, i) => {
+  trail.forEach((r, i) => {
     if (r.status === 'failed') lastFailedIdx = i;
   });
 
-  active.trail.forEach((r, i) => {
+  trail.forEach((r, i) => {
     lines.push({
       kind: 'meta',
       at: r.at,
       text: `attempt ${r.attempt}/${active.maxAttempts} · ${r.stage} ${r.status}${r.detail ? ` — ${r.detail}` : ''}`,
     });
-    if (i === lastFailedIdx && active.lastTraceback) {
-      for (const tl of active.lastTraceback.split('\n')) {
+    if (i === lastFailedIdx && traceback) {
+      for (const tl of traceback.split('\n')) {
         lines.push({ kind: 'stderr', at: r.at, text: tl });
       }
     }
   });
 
-  if (lastFailedIdx === -1 && active.lastTraceback) {
-    for (const tl of active.lastTraceback.split('\n')) {
+  if (lastFailedIdx === -1 && traceback) {
+    for (const tl of traceback.split('\n')) {
       lines.push({ kind: 'stderr', at: '', text: tl });
     }
   }

@@ -129,10 +129,20 @@ make infra-up    # docker compose: grafana/otel-lgtm (Grafana :3000, OTLP
 make infra-down  # stop the stack (add -v in infra/ to also drop redis data)
 
 # 3. real everything (each switch independent — see degradation matrix)
-cp .env.example .env             # pick a model + set its key (see "Model provider")
-make dev-backend                 # plug in the Pico W first; port auto-discovered
-make dev-frontend
+cp .env.example .env             # at the REPO ROOT: pick a model + set its key
+make dev-backend                 # plug in the Pico W first; port auto-discovered,
+                                 #   keys auto-loaded from the repo-root .env
+make dev-frontend                # then open http://localhost:5173/app (NOT ?mock=1)
+#   click COMMISSION ▸, pick a bus device the scan found (e.g. SHTC3 @0x70) →
+#   watch AUTHOR write it, the board run it, MEDIC repair on a traceback, then a
+#   live reading. Ask PILOT "what's the temperature?" once it's admitted.
 ```
+
+> **"board offline" / "model_unavailable"?** The `.env` lives at the **repo root**
+> but the backend runs from `backend/`, and provider keys (`OPENROUTER_API_KEY`,
+> `CRUSOE_API_KEY`, …) aren't `SELFAWARE_`-prefixed, so pydantic won't inject them.
+> `make dev-backend` handles this by loading the root `.env` into the process with
+> `uv run --env-file`. If you run uvicorn by hand, add `--env-file ../.env`.
 
 The backend never *requires* the containers: if the stack is down, traces are
 dropped silently and memory degrades to a no-op client.
@@ -140,8 +150,10 @@ dropped silently and memory degrades to a no-op client.
 ### Model provider
 
 `SELFAWARE_MODEL` is the one switch — any PydanticAI `provider:model` string,
-with the matching key in `.env`. Anthropic is the default; **Crusoe** (an
-OpenAI-compatible inference endpoint) is wired in under a `crusoe:` prefix:
+with the matching key in the repo-root `.env`. Anthropic is the default;
+**OpenRouter** (`SELFAWARE_MODEL=openrouter:anthropic/claude-haiku-4.5` +
+`OPENROUTER_API_KEY`) works out of the box, and **Crusoe** (an OpenAI-compatible
+inference endpoint) is wired in under a `crusoe:` prefix:
 
 ```bash
 SELFAWARE_MODEL=crusoe:moonshotai/Kimi-K2.6

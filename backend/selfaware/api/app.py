@@ -42,21 +42,22 @@ async def _build_transport(settings: Settings) -> BoardTransport:
     NEVER a crash, NEVER a silent mock.
     """
     if settings.mock_board:
-        from selfaware.hardware.mock_board import MockBoard, ScriptedExchange, demo_fail_then_pass_script
+        from selfaware.hardware.mock_board import MockBoard, demo_fail_then_pass_script
 
-        script = demo_fail_then_pass_script()
+        # deploy+test holds the stage a beat longer than the author's thinking
+        # (2x pace): with the default 1.5s pace the fail -> repair -> pass arc
+        # runs ~9s — narratable, instead of flashing past in under a second.
+        script = demo_fail_then_pass_script(delay_s=settings.mock_pace_s * 2)
         for exchange in script:
             # Pin the demo beats to the commission's harness execs (the only
             # pre-registration code containing the host-authored read call), so
             # a board_scan or stray exec before the commission cannot eat them.
             exchange.match = r"Driver\(\)\.read\(\)"
-        # And let a couple of cmd.board_scan runs find the known onboard I2C
-        # bricks (0x3C OLED, 0x70 SHTC3) -> discovery.device_found demos
-        # keyless too. Non-matching execs fall through to the simulators.
-        script.extend(
-            ScriptedExchange(match=r"\.scan\(\)", stdout="[60, 112]\n") for _ in range(2)
-        )
-        return MockBoard(script=script)
+        # The known onboard I2C bricks (0x3C OLED, 0x70 SHTC3) answer EVERY
+        # scan via the persistent responder — never queued, never exhausted —
+        # so discovery cards appear on the first watcher tick, before any
+        # commission, and never vanish mid-demo.
+        return MockBoard(script=script, scan_addrs=[0x3C, 0x70])
 
     from selfaware.hardware.discovery import find_board_port
     from selfaware.hardware.serial_board import SerialBoard

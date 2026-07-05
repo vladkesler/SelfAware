@@ -35,6 +35,7 @@ def _hello_event(state: AppState) -> Event:
     payload = HelloPayload(
         server_version=selfaware.__version__,
         protocol_v=selfaware.PROTOCOL_VERSION,
+        model=state.settings.model,
         board=state.session.board_status(),
         drivers=state.registry.summaries(),
     )

@@ -26,7 +26,7 @@ from selfaware.events.payloads import (
     SetCommand,
     StimulateCommand,
 )
-from selfaware.events.types import CommandType, EventType
+from selfaware.events.types import AgentId, CommandType, EventType
 from selfaware.hardware.discovery import I2C_SCAN_SNIPPET, KNOWN_I2C_DEVICES
 from selfaware.hardware.mock_board import MockBoard
 from selfaware.registry.store import DriverToolError
@@ -141,7 +141,7 @@ def _make_chat(state: AppState):
                 deps=state.copilot_deps,
                 bus=state.bus,
                 settings=state.settings,
-                agent_name="copilot",
+                agent_name=AgentId.PILOT,
                 message_history=history,
             )
         except ModelUnavailable as exc:

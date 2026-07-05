@@ -9,6 +9,7 @@ leak into the suite.
 """
 
 import asyncio
+import os
 
 import pytest
 from pydantic_ai import models
@@ -23,6 +24,17 @@ from selfaware.registry.store import DriverRegistry
 models.ALLOW_MODEL_REQUESTS = False  # any real provider call RAISES, suite-wide
 
 
+@pytest.fixture(autouse=True)
+def _isolate_ambient_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`make test` exports the root .env into the process environment;
+    Settings(_env_file=None) skips the file but still reads os.environ.
+    Strip every SELFAWARE_* switch and provider key so a developer's .env
+    can never steer the suite (mock flags, models, keys)."""
+    for key in list(os.environ):
+        if key.startswith("SELFAWARE_") or key.endswith("_API_KEY"):
+            monkeypatch.delenv(key, raising=False)
+
+
 @pytest.fixture
 def bus() -> EventBus:
     return EventBus()
@@ -30,8 +42,10 @@ def bus() -> EventBus:
 
 @pytest.fixture
 def settings() -> Settings:
-    """Env-isolated settings; mock_board=True is the suite's only board."""
-    return Settings(_env_file=None, mock_board=True)
+    """Env-isolated settings; mock_board=True is the suite's only board.
+
+    mock_pace_s=0: the theatrical demo pacing must NEVER slow the suite."""
+    return Settings(_env_file=None, mock_board=True, mock_pace_s=0.0)
 
 
 @pytest.fixture

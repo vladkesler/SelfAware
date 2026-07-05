@@ -13,7 +13,8 @@
           "mock": true,
           "busy": false
         },
-        "drivers": []
+        "drivers": [],
+        "model": "anthropic:claude-sonnet-5"
       }
     }
   },
@@ -60,18 +61,20 @@
     }
   },
   {
-    "afterMs": 800,
+    "afterMs": 150,
     "event": {
       "v": 1,
-      "type": "agent.thought",
+      "type": "board.status",
       "payload": {
-        "agent": "driver_author",
-        "text": "Analog class on GP27 (ADC1). Driver plan: machine.ADC on GP27, average 8 samples per read with adc.read(), no busy-waits, no IRQs."
+        "connected": true,
+        "port_id": "mock://demo",
+        "mock": true,
+        "busy": true
       }
     }
   },
   {
-    "afterMs": 700,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -85,7 +88,60 @@
     }
   },
   {
-    "afterMs": 1400,
+    "afterMs": 1200,
+    "event": {
+      "v": 1,
+      "type": "agent.thought",
+      "payload": {
+        "agent": "author",
+        "text": "Light sensor (LDR) is a plain analog device, so this is one ADC channel on GP27. Sampling 8x with 1ms spacing and averaging with adc.read() to smooth out noise."
+      }
+    }
+  },
+  {
+    "afterMs": 280,
+    "event": {
+      "v": 1,
+      "type": "agent.tool_call",
+      "payload": {
+        "agent": "author",
+        "tool": "dry_gate",
+        "args": {
+          "lines": 13
+        },
+        "tool_call_id": "dg-1"
+      }
+    }
+  },
+  {
+    "afterMs": 360,
+    "event": {
+      "v": 1,
+      "type": "agent.tool_result",
+      "payload": {
+        "agent": "author",
+        "tool": "dry_gate",
+        "tool_call_id": "dg-1",
+        "ok": true,
+        "preview": "passed · no gate violations"
+      }
+    }
+  },
+  {
+    "afterMs": 500,
+    "event": {
+      "v": 1,
+      "type": "commission.code",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 1,
+        "code": "import machine\nimport time\n\nclass Driver:\n    def __init__(self):\n        self.adc = machine.ADC(27)\n\n    def read(self):\n        total = 0\n        for _ in range(8):\n            total += self.adc.read()\n            time.sleep_ms(1)\n        return total // 8\n",
+        "is_repair": false
+      }
+    }
+  },
+  {
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -99,7 +155,7 @@
     }
   },
   {
-    "afterMs": 300,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -113,7 +169,7 @@
     }
   },
   {
-    "afterMs": 700,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -127,7 +183,7 @@
     }
   },
   {
-    "afterMs": 300,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -141,7 +197,7 @@
     }
   },
   {
-    "afterMs": 900,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -155,7 +211,7 @@
     }
   },
   {
-    "afterMs": 300,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -169,7 +225,7 @@
     }
   },
   {
-    "afterMs": 1100,
+    "afterMs": 600,
     "event": {
       "v": 1,
       "type": "commission.traceback",
@@ -182,7 +238,7 @@
     }
   },
   {
-    "afterMs": 200,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -191,12 +247,12 @@
         "attempt": 1,
         "stage": "test",
         "status": "failed",
-        "detail": "board raised ValueError"
+        "detail": "board raised"
       }
     }
   },
   {
-    "afterMs": 500,
+    "afterMs": 2500,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -210,18 +266,60 @@
     }
   },
   {
-    "afterMs": 900,
+    "afterMs": 1000,
     "event": {
       "v": 1,
       "type": "agent.thought",
       "payload": {
-        "agent": "driver_author",
-        "text": "The board replied: AttributeError — 'ADC' object has no attribute 'read'. That's the ESP32 ADC API; RP2040 MicroPython exposes read_u16(). Same driver, corrected read call."
+        "agent": "medic",
+        "text": "The board replied: AttributeError — 'ADC' object has no attribute 'read'. That is the ESP32 ADC API; RP2040 MicroPython exposes read_u16(). Same averaged read, corrected method call."
       }
     }
   },
   {
-    "afterMs": 600,
+    "afterMs": 280,
+    "event": {
+      "v": 1,
+      "type": "agent.tool_call",
+      "payload": {
+        "agent": "medic",
+        "tool": "dry_gate",
+        "args": {
+          "lines": 13
+        },
+        "tool_call_id": "dg-2"
+      }
+    }
+  },
+  {
+    "afterMs": 360,
+    "event": {
+      "v": 1,
+      "type": "agent.tool_result",
+      "payload": {
+        "agent": "medic",
+        "tool": "dry_gate",
+        "tool_call_id": "dg-2",
+        "ok": true,
+        "preview": "passed · no gate violations"
+      }
+    }
+  },
+  {
+    "afterMs": 450,
+    "event": {
+      "v": 1,
+      "type": "commission.code",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "attempt": 2,
+        "code": "import machine\nimport time\n\nclass Driver:\n    def __init__(self):\n        self.adc = machine.ADC(27)\n\n    def read(self):\n        total = 0\n        for _ in range(8):\n            total += self.adc.read_u16()\n            time.sleep_ms(1)\n        return total // 8\n",
+        "is_repair": true
+      }
+    }
+  },
+  {
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -235,35 +333,7 @@
     }
   },
   {
-    "afterMs": 300,
-    "event": {
-      "v": 1,
-      "type": "commission.stage",
-      "payload": {
-        "commission_id": "c-ldr-001",
-        "attempt": 2,
-        "stage": "generate",
-        "status": "started",
-        "detail": "regenerating with failure context"
-      }
-    }
-  },
-  {
-    "afterMs": 1200,
-    "event": {
-      "v": 1,
-      "type": "commission.stage",
-      "payload": {
-        "commission_id": "c-ldr-001",
-        "attempt": 2,
-        "stage": "generate",
-        "status": "passed",
-        "detail": "41 lines, imports: machine"
-      }
-    }
-  },
-  {
-    "afterMs": 250,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -277,7 +347,7 @@
     }
   },
   {
-    "afterMs": 600,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -291,7 +361,7 @@
     }
   },
   {
-    "afterMs": 250,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -305,7 +375,7 @@
     }
   },
   {
-    "afterMs": 800,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -319,7 +389,7 @@
     }
   },
   {
-    "afterMs": 250,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -333,7 +403,7 @@
     }
   },
   {
-    "afterMs": 900,
+    "afterMs": 750,
     "event": {
       "v": 1,
       "type": "commission.stage",
@@ -343,20 +413,6 @@
         "stage": "test",
         "status": "passed",
         "detail": "read 31842 raw_u16 — plausible for analog"
-      }
-    }
-  },
-  {
-    "afterMs": 600,
-    "event": {
-      "v": 1,
-      "type": "commission.passed",
-      "payload": {
-        "commission_id": "c-ldr-001",
-        "slug": "ldr",
-        "attempts_used": 2,
-        "reading": 31842,
-        "unit": "raw_u16"
       }
     }
   },
@@ -377,6 +433,33 @@
         ],
         "code_hash": "a3f9c2e17d40",
         "unit": "raw_u16"
+      }
+    }
+  },
+  {
+    "afterMs": 650,
+    "event": {
+      "v": 1,
+      "type": "commission.passed",
+      "payload": {
+        "commission_id": "c-ldr-001",
+        "slug": "ldr",
+        "attempts_used": 2,
+        "reading": 31842,
+        "unit": "raw_u16"
+      }
+    }
+  },
+  {
+    "afterMs": 250,
+    "event": {
+      "v": 1,
+      "type": "board.status",
+      "payload": {
+        "connected": true,
+        "port_id": "mock://demo",
+        "mock": true,
+        "busy": false
       }
     }
   },
@@ -1157,6 +1240,61 @@
         "value": 30714,
         "unit": "raw_u16",
         "plausible": true
+      }
+    }
+  },
+  {
+    "afterMs": 1600,
+    "event": {
+      "v": 1,
+      "type": "agent.tool_call",
+      "payload": {
+        "agent": "pilot",
+        "tool": "read_ldr",
+        "args": {},
+        "tool_call_id": "pilot-read-1"
+      }
+    }
+  },
+  {
+    "afterMs": 520,
+    "event": {
+      "v": 1,
+      "type": "agent.tool_result",
+      "payload": {
+        "agent": "pilot",
+        "tool": "read_ldr",
+        "tool_call_id": "pilot-read-1",
+        "ok": true,
+        "preview": "30714 raw_u16"
+      }
+    }
+  },
+  {
+    "afterMs": 320,
+    "event": {
+      "v": 1,
+      "type": "agent.message",
+      "payload": {
+        "agent": "pilot",
+        "delta": "The light sensor reads 30714 raw_u16 — that read_ldr tool didn't exist a minute ago.",
+        "done": false
+      }
+    }
+  },
+  {
+    "afterMs": 140,
+    "event": {
+      "v": 1,
+      "type": "agent.message",
+      "payload": {
+        "agent": "pilot",
+        "delta": "",
+        "done": true,
+        "usage": {
+          "input_tokens": 340,
+          "output_tokens": 26
+        }
       }
     }
   }
