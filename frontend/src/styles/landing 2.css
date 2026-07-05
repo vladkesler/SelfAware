@@ -561,6 +561,7 @@
   align-items: center;
   min-height: 33vh;
   background: var(--bg-void);
+  border-top: 1px solid var(--line);
   padding: calc(var(--unit) * 8) calc(var(--unit) * 6);
   overflow: hidden;
 }
