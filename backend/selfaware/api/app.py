@@ -14,6 +14,7 @@ whole story. A real board that fails discovery stays HONESTLY disconnected;
 there is no silent fallback anywhere in this file.
 """
 
+import asyncio
 import contextlib
 from collections.abc import AsyncIterator
 
@@ -21,6 +22,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import selfaware
+from selfaware.analytics.history import HistoryStore
+from selfaware.analytics.watcher import HealthWatcher
 from selfaware.api import handlers, rest, ws
 from selfaware.api.state import AppState
 from selfaware.bringup.loop import AuthorFn, CommissionRunner
@@ -42,21 +45,25 @@ async def _build_transport(settings: Settings) -> BoardTransport:
     NEVER a crash, NEVER a silent mock.
     """
     if settings.mock_board:
-        from selfaware.hardware.mock_board import MockBoard, ScriptedExchange, demo_fail_then_pass_script
+        from selfaware.hardware.mock_board import MockBoard, demo_fail_then_pass_script
 
-        script = demo_fail_then_pass_script()
+        # deploy+test holds the stage a beat longer than the author's thinking
+        # (2x pace): with the default 1.5s pace the fail -> repair -> pass arc
+        # runs ~9s — narratable, instead of flashing past in under a second.
+        script = demo_fail_then_pass_script(delay_s=settings.mock_pace_s * 2)
         for exchange in script:
-            # Pin the demo beats to the commission's harness execs (the only
-            # pre-registration code containing the host-authored read call), so
-            # a board_scan or stray exec before the commission cannot eat them.
-            exchange.match = r"Driver\(\)\.read\(\)"
-        # And let a couple of cmd.board_scan runs find the known onboard I2C
-        # bricks (0x3C OLED, 0x70 SHTC3) -> discovery.device_found demos
-        # keyless too. Non-matching execs fall through to the simulators.
-        script.extend(
-            ScriptedExchange(match=r"\.scan\(\)", stdout="[60, 112]\n") for _ in range(2)
-        )
-        return MockBoard(script=script)
+            # Pin the demo beats to the LDR commission specifically — its read
+            # payload is the only pre-registration code containing `ADC(27)`.
+            # Scoping to LDR (not any `Driver().read()`) means the flagship arc
+            # plays for the LDR beat while every OTHER sensor commissions cleanly
+            # on attempt 1 via its own simulator, instead of being hijacked by
+            # the canned ADC traceback + a reading outside its plausibility window.
+            exchange.match = r"ADC\(\s*27\s*\)"
+        # The known onboard I2C bricks (0x3C OLED, 0x70 SHTC3) answer EVERY
+        # scan via the persistent responder — never queued, never exhausted —
+        # so discovery cards appear on the first watcher tick, before any
+        # commission, and never vanish mid-demo.
+        return MockBoard(script=script, scan_addrs=[0x3C, 0x70])
 
     from selfaware.hardware.discovery import find_board_port
     from selfaware.hardware.serial_board import SerialBoard
@@ -96,6 +103,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         registry = DriverRegistry(bus)
         session.bind_registry(registry)
 
+        # 4b. reading history for analytics/health.py — one bus subscription,
+        #     fed by the same sensor.reading events the poller already publishes.
+        history = HistoryStore(bus)
+        history_task = asyncio.create_task(history.run())
+
         # 5. memory — one ping decides Http vs Null; nothing blocks on it later
         from selfaware.memory.client import HttpMemoryClient
 
@@ -112,8 +124,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
             author = build_author(app_settings)
 
+        # 6b. the OLED narrator — built here so the loop can animate the arc on
+        #     the onboard display through its own exclusive board handle. Started
+        #     later (step 11b) with the other ambience; degrades to a no-op with
+        #     no board / MockBoard / SELFAWARE_OLED_ENABLED=false.
+        from selfaware.hardware.oled_narrator import OledNarrator
+
+        oled = OledNarrator(session, bus, app_settings)
+
         # 7. the loop + its single door
-        runner = CommissionRunner(session, registry, bus, author, app_settings)
+        runner = CommissionRunner(session, registry, bus, author, app_settings, oled=oled)
         commissioner = CommissionService(runner, bus, memory=memory)
 
         # 8. copilot deps (session, never the transport — invariant #3)
@@ -136,6 +156,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             transport=transport,
             session=session,
             registry=registry,
+            history=history,
             memory=memory,
             runner=runner,
             commissioner=commissioner,
@@ -146,12 +167,46 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         handlers.bind(state)
         await session.start_poller()
 
+        # 10. discovery — periodic I2C scan so a plugged-in device materializes
+        #     as a DeviceRail card (idles harmlessly when the board is absent).
+        from selfaware.hardware.watcher import DiscoveryWatcher
+
+        watcher = DiscoveryWatcher(session, bus, app_settings)
+        state.extras["watcher"] = watcher  # /ws replays its presences on connect
+        await watcher.start()
+
+        # 11. health — periodic scoring over the reading history -> sensor.health
+        #     (pure compute: no wire, no lock; /ws replays current_health on connect).
+        health_watcher = HealthWatcher(registry, history, bus, app_settings)
+        state.extras["health_watcher"] = health_watcher
+        await health_watcher.start()
+
+        # 11b. the OLED narrator — subscribe + render the agentic work on the
+        #      onboard SSD1306. Last ambience up, first down.
+        state.extras["oled"] = oled
+        await oled.start()
+
         try:
             yield
         finally:
-            # shutdown: reverse order, every step shielded
+            # shutdown: reverse order, every step shielded. Stop the derived
+            # watchers first, then the poller (session.close), then the history
+            # listener — so history stops only once its data source has actually
+            # stopped publishing, not before.
+            with contextlib.suppress(Exception):
+                await oled.stop()  # newest ambience, stopped first; never touches shared state
+            with contextlib.suppress(Exception):
+                await health_watcher.stop()  # pure compute — safe to stop anytime
+            with contextlib.suppress(Exception):
+                await watcher.stop()  # stop scanning before the wire closes
             with contextlib.suppress(Exception):
                 await session.close()  # stops the poller, closes the transport
+            history_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                # CancelledError is a BaseException (3.8+), so suppress(Exception)
+                # alone would NOT catch the cancellation we just triggered; also
+                # covers history.run() having already died on an earlier error.
+                await history_task
             aclose = getattr(memory, "aclose", None)
             if aclose is not None:
                 with contextlib.suppress(Exception):

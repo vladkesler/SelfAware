@@ -12,6 +12,7 @@ dependencies = [
     "pyserial>=3.5",
     "logfire>=3.5",
     "httpx>=0.28",
+    "fastmcp>=2.0",
 ]
 
 [project.optional-dependencies]

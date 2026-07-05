@@ -72,8 +72,11 @@ class RxBuffer:
 def parse_exec_reply(stdout_bytes: bytes, stderr_bytes: bytes, duration_s: float) -> ExecResult:
     """Decode the two EOT-framed sections into an ExecResult.
 
-    Build-day job: decode with errors='replace', normalize CRLF -> LF in
-    stdout, but keep stderr byte-faithful modulo line endings — it is the
-    VERBATIM traceback and must round-trip into prompts and the UI untouched.
+    Decode with errors='replace' (never raise on a stray byte), normalize
+    CRLF -> LF on both streams (the board's USB-CDC line endings are noise, not
+    signal). stderr is otherwise kept byte-faithful — it is the VERBATIM
+    traceback and must round-trip into repair prompts and the UI untouched.
     """
-    raise NotImplementedError("build day: decode + normalize line endings into ExecResult")
+    stdout = stdout_bytes.decode("utf-8", errors="replace").replace("\r\n", "\n")
+    stderr = stderr_bytes.decode("utf-8", errors="replace").replace("\r\n", "\n")
+    return ExecResult(stdout=stdout, stderr=stderr, duration_s=duration_s)

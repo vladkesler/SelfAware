@@ -10,7 +10,7 @@ Python 3.12, uv-managed, FastAPI + PydanticAI. Run: `make dev-backend`
 |---|---|---|
 | `config.py` | Every knob + the PicoBricks pin map; nothing else hardcodes values | `Settings`, `default_specs()` |
 | `events/` | The typed language: envelopes, payloads, bus, command routing | `EventBus.publish`, `CommandRouter.dispatch` |
-| `hardware/` | Owning the wire: framing, THE lock, mock parity, discovery | `BoardSession.exec/exclusive`, `MockBoard`, `DiscoveryWatcher` |
+| `hardware/` | Owning the wire: framing, THE lock, mock parity, discovery, OLED narrator | `BoardSession.exec/exclusive`, `MockBoard`, `DiscoveryWatcher`, `OledNarrator` ([oled-narrator.md](oled-narrator.md)) |
 | `bringup/` | The self-repair loop + deterministic host gates | `CommissionService.enqueue`, `CommissionRunner.run`, `run_gate` |
 | `agents/` | LLM roles: driver author + dashboard copilot + streaming bridge | `write_driver`, `copilot_agent`, `run_agent_streaming` |
 | `registry/` | Verified capabilities: records + call-time-resolved tools | `DriverRegistry.register/update_code/as_toolset` |

@@ -17,6 +17,8 @@ API key (the flagship demo must never depend on credentials). The reasoning
 strings ARE the narration — they land in the UI via agent.thought.
 """
 
+import asyncio
+
 from selfaware.bringup.models import BringupSpec, DriverGenOutput
 from selfaware.config import Settings
 
@@ -59,9 +61,15 @@ def build_mock_author(settings: Settings):
 
     Keyed on attempt_n, not internal state, so a re-run of the demo (or a
     re-commission) replays the same story deterministically.
+
+    settings.mock_pace_s (0 in tests) is slept before every attempt's output —
+    a real model thinks for seconds, and the UI narration needs that beat.
     """
+    pace = settings.mock_pace_s
 
     async def author(spec: BringupSpec, attempt_n: int, last_error: str | None) -> DriverGenOutput:
+        if pace > 0:
+            await asyncio.sleep(pace)  # theatrical "the model is thinking" beat
         target = spec.pins.get("adc", settings.adc_capable_pins[0])
         if attempt_n == 1:
             return DriverGenOutput(
@@ -78,7 +86,6 @@ def build_mock_author(settings: Settings):
                 "The board replied: AttributeError — 'ADC' object has no attribute "
                 "'read'. That is the ESP32 ADC API; RP2040 MicroPython exposes "
                 "read_u16(). Same averaged read, corrected method call."
-                + (f" (board said: {last_error.splitlines()[-1]})" if last_error else "")
             ),
             driver_code=_DRIVER_CORRECTED.format(pin=target),
             imports_used="machine, time",

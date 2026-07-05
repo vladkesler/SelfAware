@@ -15,6 +15,25 @@ export type StageStatus = 'started' | 'passed' | 'failed';
 export type ProtocolClass = 'analog' | 'digital_bus' | 'pulse_timing' | 'output';
 export type DriverStatus = 'commissioning' | 'active' | 'failed';
 
+/**
+ * The honest cast on the wire (mirror of backend AgentId). AUTHOR + MEDIC are
+ * the driver LLM in generate/repair mode; PILOT operates admitted drivers as
+ * tools. `normalizeAgent` folds legacy fixture strings (driver_author→author,
+ * copilot→pilot) so old recordings still play.
+ */
+export type AgentId = 'author' | 'medic' | 'pilot';
+
+export function normalizeAgent(a: string): AgentId {
+  if (a === 'medic') return 'medic';
+  if (a === 'pilot' || a === 'copilot') return 'pilot';
+  return 'author'; // 'author' and legacy 'driver_author'
+}
+
+/** Agents that participate in a commission (their thoughts/tools join the trail). */
+export function isCommissionAgent(a: string): boolean {
+  return normalizeAgent(a) !== 'pilot';
+}
+
 /** Server→client envelope, generic over the dot-namespaced type + payload. */
 interface Env<T extends string, P> {
   v: 1;
@@ -47,6 +66,8 @@ export interface DriverSummary {
 export interface SystemHello {
   server_version: string;
   protocol_v: number;
+  /** The model the agents run on, e.g. "anthropic:claude-sonnet-5" (optional). */
+  model?: string;
   board: BoardStatusP;
   drivers: DriverSummary[];
 }
@@ -82,6 +103,14 @@ export interface CommissionStage {
   stage: Stage;
   status: StageStatus;
   detail: string;
+}
+export interface CommissionCode {
+  commission_id: string;
+  attempt: number;
+  /** Full generated MicroPython source, VERBATIM, pre-gate — every attempt. */
+  code: string;
+  /** True when regenerated with the previous verbatim error in hand. */
+  is_repair: boolean;
 }
 export interface CommissionTraceback {
   commission_id: string;
@@ -142,6 +171,20 @@ export interface ActuatorState {
   ok: boolean;
 }
 
+export interface HealthTrendWire {
+  direction: string; // "stable" | "degrading" | "critical" | "insufficient_data"
+  eta_s: number | null; // seconds to critical, only while worsening
+  note: string | null;
+}
+export interface SensorHealth {
+  slug: string;
+  status: 'healthy' | 'degrading' | 'critical' | 'unknown' | 'not_monitored';
+  reasons: string[]; // named, never a bare score
+  readings_count: number;
+  baseline_target: number;
+  trend: HealthTrendWire;
+}
+
 export interface DeviceFound {
   bus: 'i2c' | 'adc';
   addr?: number | null;
@@ -187,6 +230,7 @@ export type ServerEvent =
   | Env<'board.status', BoardStatusP>
   | Env<'commission.started', CommissionStarted>
   | Env<'commission.stage', CommissionStage>
+  | Env<'commission.code', CommissionCode>
   | Env<'commission.traceback', CommissionTraceback>
   | Env<'commission.passed', CommissionPassed>
   | Env<'commission.failed', CommissionFailed>
@@ -195,6 +239,7 @@ export type ServerEvent =
   | Env<'agent.tool_result', AgentToolResult>
   | Env<'agent.message', AgentMessage>
   | Env<'sensor.reading', SensorReading>
+  | Env<'sensor.health', SensorHealth>
   | Env<'actuator.state', ActuatorState>
   | Env<'discovery.device_found', DeviceFound>
   | Env<'discovery.device_lost', DeviceLost>
@@ -214,6 +259,7 @@ export const KNOWN_EVENT_TYPES: readonly EventType[] = [
   'board.status',
   'commission.started',
   'commission.stage',
+  'commission.code',
   'commission.traceback',
   'commission.passed',
   'commission.failed',
@@ -222,6 +268,7 @@ export const KNOWN_EVENT_TYPES: readonly EventType[] = [
   'agent.tool_result',
   'agent.message',
   'sensor.reading',
+  'sensor.health',
   'actuator.state',
   'discovery.device_found',
   'discovery.device_lost',

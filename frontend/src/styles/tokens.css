@@ -1,39 +1,89 @@
 /**
- * Design tokens — a dark instrument in a quiet room, not a SaaS dashboard.
- * Three surface steps, hairlines instead of shadows, ONE phosphor accent,
- * one RESERVED alert red (tracebacks + failure states, nothing else).
- * The build-day craft pass works directly against this file.
+ * SelfAware tokens — a powered instrument: blue hum, orange strike.
+ *
+ * 60/30/10: cool graphite structure / cool-gray voice / color only where it
+ * MEANS something. Four semantics, strictly scoped:
+ *   ion    — powered structure: chrome, focus, identity, idle-but-on
+ *   live   — alive · verified · live signal (the only success color; orange)
+ *   charge — current in flight, verdict pending (running ≠ succeeded; gold)
+ *   alert  — RESERVED: the board's verbatim voice + failure states
+ * The hum is blue; orange strikes only when the board proves it's alive.
  */
-
 :root {
-  /* surfaces — near-black, warm-neutral, three steps only */
-  --bg-void: #0a0b0d;
-  --bg-panel: #101216;
-  --bg-raised: #161a20;
-  --line: rgb(255 255 255 / 0.07); /* hairline borders, never shadows */
+  color-scheme: dark;
 
-  /* one phosphor accent (green CRT) + one reserved alert */
-  --phosphor: #3dffa0;
-  --phosphor-dim: #1e7a52;
-  --phosphor-glow: rgb(61 255 160 / 0.35); /* text-shadow / box-shadow only */
-  --alert: #ff5c5c; /* RESERVED: verbatim tracebacks + failure states */
+  /* surfaces — cool graphite, panels clearly lifted off the void */
+  --bg-void: #0f1216; /* the room */
+  --bg-panel: #181e25; /* instrument face */
+  --bg-raised: #202730; /* cards, chips */
+  --bg-overlay: #29313c; /* code wells, expanded rows, the stamp plate */
 
-  --text: #e7eaee;
-  --text-muted: #7c8591;
+  /* hairlines — never shadows */
+  --line: rgb(210 230 255 / 0.09);
+  --line-strong: rgb(210 230 255 / 0.18);
+
+  /* text — four tiers, cool off-whites */
+  --text-bright: #f2f6fa; /* hero numbers, verdicts */
+  --text: #e2e8ef; /* primary */
+  --text-dim: #a8b4c2; /* labels, meta */
+  --text-faint: #7d8896; /* decorative chrome only, never load-bearing */
+  --text-muted: var(--text-dim); /* legacy alias */
+
+  /* ion — powered structure: the hum */
+  --ion: #5cb2ff;
+  --ion-dim: #4f8ec9;
+  --ion-glow: rgb(92 178 255 / 0.35);
+  --ion-tint: rgb(92 178 255 / 0.07);
+
+  /* live — signal orange: the strike */
+  --live: #ff8a3d;
+  --live-dim: #c86e2c;
+  --live-glow: rgb(255 138 61 / 0.4);
+  --live-tint: rgb(255 138 61 / 0.08);
+
+  /* charge — in flight, not yet judged */
+  --charge: #ffc94d;
+  --charge-dim: #b08e3c;
+  --charge-glow: rgb(255 201 77 / 0.35);
+
+  /* alert — reserved */
+  --alert: #ff5d4d;
+  --alert-dim: #b04a40;
+  --alert-glow: rgb(255 93 77 / 0.35);
+  --alert-tint: rgb(255 93 77 / 0.08);
 
   /* two voices */
-  --font-machine: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-  --font-voice: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-machine:
+    'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-voice: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
 
-  /* motion — events arrive as pulses; stages ignite; only the scope idles */
-  --pulse-ms: 180ms; /* arrival flash on panel chrome */
-  --stage-ms: 320ms; /* stepper stage transitions */
-  --reveal-ms: 600ms; /* page-level scroll reveals (why-section, footer) */
-  --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
+  /* type — projector-first (~1.25 off 16px); nothing load-bearing < 14px */
+  --fs-micro: 13px; /* tracked-caps panel titles, lane tags only */
+  --fs-meta: 14px; /* timestamps, attempt counters, card meta */
+  --fs-mono: 15px; /* code, log lines, terminal */
+  --fs-body: 16px; /* chat, prose, card titles */
+  --fs-emph: 20px; /* act titles, verdict copy */
+  --fs-head: 24px; /* rail live readings, gate verdict */
+  --fs-display: 32px; /* stamp lettering, empty states */
+  --fs-hero: 60px; /* THE reading — tabular-nums */
 
+  /* spacing & shape — workbench-tight */
   --unit: 4px;
-  --radius: 4px; /* tight radii; instruments, not bubbles */
+  --pad-panel: 12px;
+  --radius: 4px;
+  --radius-lg: 8px;
 
+  /* motion — events pulse, current flows, the stamp lands once */
+  --pulse-ms: 180ms; /* arrival flash on panel chrome */
+  --stage-ms: 380ms; /* relay/circuit node transitions — gentle, never a snap */
+  --act-ms: 420ms; /* act enter / attempt collapse / stage cross-fade */
+  --stamp-ms: 640ms; /* the admission thunk */
+  --flow-s: 1.6s; /* dash-march period on live traces */
+  --reveal-ms: 600ms; /* page-level scroll reveals (landing sections) */
+  --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* landing chrome */
   --navbar-h: 64px;
-  --bg-void-translucent: rgb(10 11 13 / 0.72);
+  --bg-void-translucent: rgb(15 18 22 / 0.72); /* --bg-void at 72% for the frosted navbar */
 }

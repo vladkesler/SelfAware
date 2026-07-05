@@ -13,7 +13,8 @@ import teaser from '../../fixtures/teaser.json';
 
 const MAX_LINES = 7;
 
-type LineKind = 'default' | 'thought' | 'stage';
+/* 'passed' is the admission moment — the one line that earns the live orange */
+type LineKind = 'default' | 'thought' | 'stage' | 'passed';
 
 interface TeaserLine {
   text: string;
@@ -46,13 +47,13 @@ function toLine(ev: AnyEvent): TeaserLine {
         return {
           text: `✓ commissioned in ${ev.payload.attempts_used} attempts`,
           alert: false,
-          kind: 'default',
+          kind: 'passed',
         };
       case 'driver.registered':
         return {
           text: `+ tool ${ev.payload.tool_names[0] ?? ev.payload.slug} registered`,
           alert: false,
-          kind: 'default',
+          kind: 'passed',
         };
       case 'agent.thought':
         return { text: `~ ${ev.payload.text.slice(0, 56)}…`, alert: false, kind: 'thought' };
@@ -73,6 +74,7 @@ function lineClassName(line: TeaserLine): string {
   if (line.alert) return ' teaser__line--alert';
   if (line.kind === 'thought') return ' teaser__line--thought';
   if (line.kind === 'stage') return ' teaser__line--stage';
+  if (line.kind === 'passed') return ' teaser__line--passed';
   return '';
 }
 

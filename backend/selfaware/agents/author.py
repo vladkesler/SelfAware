@@ -109,6 +109,13 @@ def resolve_model(settings: Settings, override: str | None = None) -> str | Mode
     return model
 
 
+def ensure_model_available(settings: Settings) -> None:
+    """Fail BEFORE a commission starts when the author model can't run — one
+    clean ModelUnavailable instead of a commission.started followed by a crash.
+    Shared by the WS cmd.commission handler and POST /api/commission."""
+    resolve_model(settings, settings.author_model)
+
+
 author_agent: Agent[AuthorDeps, DriverGenOutput] = Agent(
     # model deliberately omitted — resolved per run (keyless import, TestModel-friendly)
     deps_type=AuthorDeps,
@@ -199,8 +206,13 @@ async def write_driver(
 
     Non-streaming on purpose: structured-output JSON deltas are useless to the
     UI; the loop narrates via commission.* events and agent.thought instead.
-    `usage` may be shared across a commission's attempts so the whole run has
-    one budget.
+
+    `usage` defaults to a FRESH counter per call. It must NOT be shared across a
+    commission's attempts: request_limit below is checked against usage.requests,
+    so a shared counter turns this per-attempt safety cap into a per-commission
+    one and later attempts crash with UsageLimitExceeded. Callers that want
+    cross-attempt token accounting should sum the returned usages, not thread one
+    RunUsage through the limit.
     """
     prompt = (
         render_generate_prompt(spec, deps.few_shot)
@@ -212,7 +224,16 @@ async def write_driver(
         deps=deps,
         model=resolve_model(settings, settings.author_model),
         usage=usage,
-        usage_limits=UsageLimits(request_limit=4),  # 1 request + schema retries, never a loop
+        # Per-attempt cap on THIS attempt's fresh usage: 1 primary request + up
+        # to the agent's schema retries (retries=2 -> 3), plus a slot of slack.
+        # Bounds ONE authoring attempt, never a loop; the LOOP owns the
+        # per-commission attempt budget. See the `usage` note above: this must be
+        # checked against a per-call counter, not a shared one.
+        usage_limits=UsageLimits(request_limit=4),
+        # Override the module-default max_tokens from config: a reasoning model
+        # burns thousands of thinking tokens before the driver JSON, and 2048
+        # (the keyless-import default) truncates the response to nothing.
+        model_settings=ModelSettings(temperature=0.2, max_tokens=settings.author_max_tokens),
     )
     return result.output
 
@@ -222,12 +243,15 @@ def build_author(settings: Settings):
     ((spec, attempt_n, last_error) -> DriverGenOutput).
 
     Stateful closure: remembers the code it last produced so the repair prompt
-    can show it (the seam itself carries only the error string), and shares
-    one RunUsage across a commission's attempts.
+    can show it (the seam itself carries only the error string).
+
+    Each attempt gets its OWN usage counter (write_driver's default). The
+    request_limit there is per-attempt, so a shared RunUsage would accumulate
+    across attempts and crash a later repair with UsageLimitExceeded (surfaced
+    to the UI as commission_crash) — the exact bug this closure must not create.
     """
     board_profile = render_board_profile(settings)
     previous_code = ""
-    usage = RunUsage()
 
     async def author(spec: BringupSpec, attempt_n: int, last_error: str | None) -> DriverGenOutput:
         nonlocal previous_code
@@ -240,7 +264,7 @@ def build_author(settings: Settings):
                 failure_kind=classify_failure(last_error),
                 verbatim_error=last_error,
             )
-        gen = await write_driver(spec, deps, settings, attempt=attempt, usage=usage)
+        gen = await write_driver(spec, deps, settings, attempt=attempt)
         previous_code = gen.driver_code
         return gen
 

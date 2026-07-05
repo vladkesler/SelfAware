@@ -24,11 +24,12 @@ class EventType(StrEnum):
     # commission.* — the self-repair loop, narrated stage by stage
     COMMISSION_STARTED = "commission.started"
     COMMISSION_STAGE = "commission.stage"
+    COMMISSION_CODE = "commission.code"
     COMMISSION_TRACEBACK = "commission.traceback"
     COMMISSION_PASSED = "commission.passed"
     COMMISSION_FAILED = "commission.failed"
 
-    # agent.* — LLM activity (author + copilot), streamed
+    # agent.* — LLM activity, streamed. `agent` field ∈ AgentId (author|medic|pilot)
     AGENT_THOUGHT = "agent.thought"
     AGENT_TOOL_CALL = "agent.tool_call"
     AGENT_TOOL_RESULT = "agent.tool_result"
@@ -37,6 +38,9 @@ class EventType(StrEnum):
     # live values
     SENSOR_READING = "sensor.reading"
     ACTUATOR_STATE = "actuator.state"
+
+    # sensor.health — derived health verdict + degradation trend (analytics/)
+    SENSOR_HEALTH = "sensor.health"
 
     # discovery.* — plug-and-detect (I2C identity; ADC presence-only)
     DISCOVERY_DEVICE_FOUND = "discovery.device_found"
@@ -97,3 +101,19 @@ class DriverStatus(StrEnum):
     COMMISSIONING = "commissioning"
     ACTIVE = "active"  # passed on real silicon — the ONLY status that arms tools
     FAILED = "failed"
+
+
+class AgentId(StrEnum):
+    """WHO is speaking on an agent.* event — the honest cast of real agents.
+
+    AUTHOR and MEDIC are the same driver_author LLM in two genuinely different
+    modes (generate vs repair); PILOT is the copilot that operates the admitted
+    drivers as tools. The scan (discovery) and verify (gate/plausibility) steps
+    are deterministic HOST code and are NOT agents — they carry no AgentId.
+    Mirrored in frontend/src/types/events.ts (with legacy aliases
+    driver_author→author, copilot→pilot for old fixtures).
+    """
+
+    AUTHOR = "author"  # writes the driver from the spec (generate stage)
+    MEDIC = "medic"  # reads the verbatim traceback and rewrites (repair stage)
+    PILOT = "pilot"  # operates admitted drivers as tools (read/decide/drive)

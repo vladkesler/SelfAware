@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     # --- explicit mocks (NEVER silent fallbacks) ------------------------------
     mock_board: bool = False  # True => MockBoard everywhere; board absent otherwise = honest disconnected
     mock_author: bool = False  # True => canned DriverGenOutput sequence; full demo runs keyless
+    mock_pace_s: float = 1.5  # theatrical pacing for mock author/board; 0 in tests
 
     # --- board / serial -------------------------------------------------------
     board_port: str = "auto"  # "auto" -> discovery.find_board_port(serial_port_glob); else a literal port id
@@ -40,15 +41,38 @@ class Settings(BaseSettings):
     pulse_exec_timeout_s: float = 12.0  # pulse_timing class gets headroom (echo timeouts stack)
     connect_timeout_s: float = 5.0
     poller_interval_s: float = 1.0
+    discovery_interval_s: float = 4.0  # I2C bus re-scan cadence (hotplug -> device_found)
+    health_interval_s: float = 4.0  # sensor.health re-score cadence (analytics/watcher.py)
+
+    # --- OLED narrator (hardware/oled_narrator.py) -----------------------------
+    # The onboard SSD1306 @0x3C narrates the agentic work instead of the factory
+    # temp/light demo. Host-authored render payloads over the raw REPL — degrades
+    # cleanly (no board -> idle, MockBoard -> harmless no-op). SELFAWARE_OLED_ENABLED=false disables.
+    oled_enabled: bool = True
+    oled_refresh_s: float = 0.5  # render-loop tick; a frame hits the wire only when it changed
+    oled_rotate_s: float = 4.0  # at-rest agent<->telemetry card rotation cadence
 
     # --- bringup loop ----------------------------------------------------------
     max_attempts: int = 4  # bounded; then honest FAILED + soft reset
     gate_max_for_range: int = 1000  # constant for-range cap enforced by the AST gate
+    author_max_tokens: int = 32768  # completion budget; reasoning models (Kimi et al.)
+    #   spend heavily on thinking BEFORE emitting the driver — 2048 starves them.
+    #   Generous headroom: a truncated response fails the whole attempt, and the
+    #   driver itself is tiny, so the only real cost of a high cap is latency.
 
     # --- services (all optional; each degrades independently) -----------------
     memory_url: str = "http://localhost:8100"  # agent-memory-server; unreachable -> NullMemoryClient
     otlp_endpoint: str = "http://localhost:4318"  # grafana/otel-lgtm OTLP-HTTP; down -> spans drop silently
     sqlite_path: str = "selfaware.db"  # registry snapshot + optional sqlite-vec
+
+    # --- MCP transport (separate process; api/rest.py + mcp_server.py) ---------
+    # Gates the two endpoints that can touch real hardware (/api/drivers/{slug}
+    # /read, /set). Empty means "not configured" — those endpoints then fail
+    # closed (403), never silently open. mcp_server.py is a SEPARATE process
+    # (see its module docstring for why) and reads SELFAWARE_MCP_* env vars
+    # directly rather than through this class; this is the only one of those
+    # knobs the main backend itself needs, to check incoming requests against.
+    mcp_token: str = ""
 
     # --- PicoBricks pin map: CONFIG VALUES, not constants ----------------------
     # Board revisions differ; flagged pins are UNCONFIRMED and must be checked
@@ -68,6 +92,7 @@ class Settings(BaseSettings):
     i2c_addr_oled: int = 0x3C  # SSD1306 128x64
     i2c_addr_shtc3: int = 0x70
     i2c_addr_motor: int = 0x22  # only on I2C-motor board revisions
+    servo_channel: int = 1  # S1..S4 servo port on the 0x22 co-processor; NOT a GPIO (buf[1]=channel+2)
     adc_capable_pins: tuple[int, ...] = (26, 27, 28)  # RP2040 physics; the gate validates ADC(n) against this
 
     def default_specs(self) -> list[BringupSpec]:
@@ -84,9 +109,13 @@ class Settings(BaseSettings):
                 protocol_class=ProtocolClass.ANALOG,
                 pins={"adc": self.pins_ldr},
                 expected_min=0,
-                expected_max=65535,
-                unit="raw",
+                expected_max=100,
+                unit="%",
                 stimulus_hint="cover the sensor with your hand",
+                extra_context=(
+                    "Report brightness as a percentage 0..100 of full scale: take the "
+                    "averaged raw u16 and return round(raw * 100 / 65535, 1)."
+                ),
             ),
             BringupSpec(
                 slug="pot",
@@ -94,9 +123,13 @@ class Settings(BaseSettings):
                 protocol_class=ProtocolClass.ANALOG,
                 pins={"adc": self.pins_pot},
                 expected_min=0,
-                expected_max=65535,
-                unit="raw",
+                expected_max=100,
+                unit="%",
                 stimulus_hint="turn the knob",
+                extra_context=(
+                    "Report the knob position as a percentage 0..100 of full scale: take "
+                    "the averaged raw u16 and return round(raw * 100 / 65535, 1)."
+                ),
             ),
             BringupSpec(
                 slug="shtc3",
@@ -139,5 +172,72 @@ class Settings(BaseSettings):
                 stimulus_hint="",
                 verify_with_slug=None,  # day-1: soft verify (loads + runs, no traceback); cross-modal later
                 extra_context="Passive buzzer: steady DC is silent — drive with PWM near resonance.",
+            ),
+            BringupSpec(
+                slug="fan",
+                display_name="Cooling fan (DC motor)",
+                protocol_class=ProtocolClass.OUTPUT,
+                pins={"sda": self.pins_i2c_sda, "scl": self.pins_i2c_scl},
+                i2c_addr=self.i2c_addr_motor,  # 0x22
+                unit="",
+                stimulus_hint="watch the fan spin",
+                verify_with_slug=None,  # soft verify: set(1)/set(0) run without a traceback
+                extra_context=(
+                    "DC fan on the PicoBricks MOTOR DRIVER: a TB6612FNG behind an I2C "
+                    "expander at address 0x22, on I2C(0, sda=GP4, scl=GP5). PicoBricks "
+                    "command protocol — build a 5-byte buffer and send it with "
+                    "i2c.writeto(0x22, buf, False):\n"
+                    "  buf[0]=0x26; buf[1]=motor_number; buf[2]=speed; buf[3]=direction; "
+                    "buf[4]=buf[1]^buf[2]^buf[3]\n"
+                    "motor_number is 1 (M1) or 2 (M2); speed is a PWM byte; direction=1 runs, "
+                    "speed=0 stops. The fan may be on EITHER the M1 or M2 screw terminal, so "
+                    "drive BOTH channels 1 and 2 (an empty channel is harmless).\n"
+                    "Implement class Driver with set(self, level), level in {0,1}:\n"
+                    "  * set(0): write speed 0 to BOTH channels — reliably STOP. Assume the "
+                    "driver LATCHES; this is the only off.\n"
+                    "  * set(1): drive BOTH channels at a CAPPED, gentle speed — NEVER full. "
+                    "Cap the speed byte at 70 (of 255) and SOFT-START (ramp up) to avoid an "
+                    "inrush brown-out that resets the board (tested-safe level). Ramp with a "
+                    "BOUNDED for-loop — the safety gate FORBIDS while-loops — e.g. `for duty "
+                    "in range(40, 71, 10): dc(1,duty,1); dc(2,duty,1); time.sleep_ms(30)`.\n"
+                    "Import only machine and time. No while, no filesystem, no reset."
+                ),
+            ),
+            BringupSpec(
+                slug="servo",
+                display_name="Servo (SG90)",
+                protocol_class=ProtocolClass.OUTPUT,
+                pins={"sda": self.pins_i2c_sda, "scl": self.pins_i2c_scl},
+                i2c_addr=self.i2c_addr_motor,  # 0x22 — servos share the co-processor with the DC motors
+                unit="",
+                stimulus_hint="watch the servo horn swing",
+                verify_with_slug=None,  # soft verify: set(1)/set(0) run without a traceback (+ your eyes)
+                extra_context=(
+                    f"Positional micro-servo (SG90) on the PicoBricks MOTOR DRIVER: a TB6612 "
+                    f"board with an I2C co-processor at address 0x22, on I2C(0, sda=GP{self.pins_i2c_sda}, "
+                    f"scl=GP{self.pins_i2c_scl}). Servos share the DC-motor command 0x26 but on SERVO "
+                    f"channels — build a 5-byte buffer and send it with i2c.writeto(0x22, buf, False):\n"
+                    f"  buf[0]=0x26; buf[1]=servo_channel+2; buf[2]=0; buf[3]=angle (0..180); "
+                    f"buf[4]=buf[1]^buf[2]^buf[3]\n"
+                    f"This servo is on port S{self.servo_channel} => servo_channel={self.servo_channel} "
+                    f"=> buf[1]={self.servo_channel + 2}.\n"
+                    "Implement class Driver with set(self, level): level is a FRACTION in [0,1] mapping "
+                    "to angle 0..180 => target = max(0, min(180, round(level * 180))). set(0)=0deg is the "
+                    "guaranteed rest/off (the co-processor LATCHES the last angle; this is the only off); "
+                    "set(1)=180deg.\n"
+                    "Make the motion clearly VISIBLE: SWEEP smoothly from the last angle to the target in "
+                    "small steps (never jump), so one set() call visibly travels the whole way. Track the "
+                    "current angle in self.pos (initialise self.pos=0 in __init__). Sweep with a "
+                    "FIXED-COUNT loop and interpolate the angle:\n"
+                    "  for i in range(0, 37):        # literal bounds REQUIRED — the gate rejects range(n) with a variable\n"
+                    "      a = self.pos + (target - self.pos) * i // 36\n"
+                    "      self._send(a & 0xFF)      # build + i2c.writeto the 5-byte buffer for angle a\n"
+                    "      time.sleep_ms(45)         # ~1.6s per full sweep — slow, smooth glide\n"
+                    "  self._send(target & 0xFF)     # land exactly on target\n"
+                    "  self.pos = target\n"
+                    "Per-angle buffer: bytearray([0x26, servo_channel+2, 0, angle, (servo_channel+2 ^ 0 ^ angle) "
+                    "& 0xFF]); send with i2c.writeto(0x22, buf, False). NO while loop (forbidden by the gate). "
+                    "Import machine and time only. No filesystem, no reset."
+                ),
             ),
         ]

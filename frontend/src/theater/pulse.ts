@@ -1,20 +1,23 @@
 /**
  * Panel pulse — a tiny pub/sub OUTSIDE React state, fed from dispatch via the
  * theater registry. Every server event may name one panel whose chrome
- * flashes for var(--pulse-ms). Panels opt in with usePanelPulse(id).
+ * flashes for var(--pulse-ms), in a semantic tone: live (orange) for life,
+ * alert for the board's bad news. Panels opt in with usePanelPulse(id).
  */
 
 import { useEffect, useState } from 'react';
 import type { PanelId } from '../types/domain';
 
-type Listener = () => void;
+export type PulseTone = 'live' | 'alert';
+
+type Listener = (tone: PulseTone) => void;
 
 const listeners = new Map<PanelId, Set<Listener>>();
 
-export function firePulse(id: PanelId): void {
+export function firePulse(id: PanelId, tone: PulseTone = 'live'): void {
   const set = listeners.get(id);
   if (!set) return;
-  set.forEach((fn) => fn());
+  set.forEach((fn) => fn(tone));
 }
 
 function subscribe(id: PanelId, fn: Listener): () => void {
@@ -37,16 +40,16 @@ function pulseMs(): number {
   return Number.isFinite(n) && n > 0 ? n : 180;
 }
 
-/** True while this panel should glow. Flips back after --pulse-ms. */
-export function usePanelPulse(id: PanelId): boolean {
-  const [on, setOn] = useState(false);
+/** The active pulse tone for this panel, or null. Clears after --pulse-ms. */
+export function usePanelPulse(id: PanelId): PulseTone | null {
+  const [tone, setTone] = useState<PulseTone | null>(null);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const unsubscribe = subscribe(id, () => {
-      setOn(true);
+    const unsubscribe = subscribe(id, (t) => {
+      setTone(t);
       clearTimeout(timer);
-      timer = setTimeout(() => setOn(false), pulseMs());
+      timer = setTimeout(() => setTone(null), pulseMs());
     });
     return () => {
       unsubscribe();
@@ -54,5 +57,5 @@ export function usePanelPulse(id: PanelId): boolean {
     };
   }, [id]);
 
-  return on;
+  return tone;
 }

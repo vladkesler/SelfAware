@@ -3,11 +3,19 @@ repair prompt embeds the verbatim traceback untouched; resolve_model gates on
 the provider key without ever calling a provider."""
 
 import pytest
+from pydantic_ai.messages import (
+    ModelRequest,
+    ModelResponse,
+    RetryPromptPart,
+    ToolCallPart,
+)
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 
 from selfaware.agents.author import (
     ModelUnavailable,
     author_agent,
+    build_author,
     render_generate_prompt,
     render_repair_prompt,
     resolve_model,
@@ -38,6 +46,44 @@ async def test_author_output_shape_with_test_model(settings: Settings) -> None:
     assert isinstance(result.output, DriverGenOutput)
     # field ORDER is load-bearing: reasoning must come first in the schema
     assert list(DriverGenOutput.model_fields) == ["reasoning", "driver_code", "imports_used"]
+
+
+async def test_build_author_does_not_accumulate_request_limit_across_attempts(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression for commission_crash: 'The next request would exceed the
+    request_limit of 4'.
+
+    write_driver's request_limit is a PER-ATTEMPT cap. If build_author shared one
+    RunUsage across attempts, its usage.requests would accumulate and a later
+    attempt would raise UsageLimitExceeded. Here the model forces one schema
+    retry per attempt (2 requests each); across max_attempts a shared counter
+    would cross 4 and crash. With per-attempt usage every attempt completes.
+    """
+    _valid = {"reasoning": "ok", "driver_code": "class Driver:\n    def read(self):\n        return 1\n", "imports_used": ""}
+
+    def one_retry_then_valid(messages: list[ModelRequest], info: AgentInfo) -> ModelResponse:
+        tool = info.output_tools[0].name
+        # A RetryPromptPart anywhere in the history means our earlier (empty-args)
+        # tool call already failed validation once — now answer valid. Otherwise
+        # return empty args to force exactly one schema-validation retry.
+        retried = any(
+            isinstance(p, RetryPromptPart) for m in messages for p in m.parts
+        )
+        args = _valid if retried else {}
+        return ModelResponse(parts=[ToolCallPart(tool_name=tool, args=args)])
+
+    # resolve_model() runs to build the run(model=) arg before override wins;
+    # give it a key so it returns a string, then override forces FunctionModel.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-real")
+    author = build_author(settings)
+    with author_agent.override(model=FunctionModel(one_retry_then_valid)):
+        # More attempts than the per-attempt request_limit (4): a shared counter
+        # would have crashed well before this loop finished.
+        for attempt_n in range(1, settings.max_attempts + 1):
+            last_error = None if attempt_n == 1 else "board raised: boom"
+            gen = await author(_spec(), attempt_n, last_error)
+            assert gen.driver_code  # every attempt converges, none crash
 
 
 def test_generate_prompt_names_the_protocol_class() -> None:

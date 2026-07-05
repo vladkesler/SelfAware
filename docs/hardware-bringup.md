@@ -7,7 +7,7 @@
 | `analog` | one ADC read | ~one line | LDR (GP27), potentiometer (GP26) |
 | `digital_bus` | I2C/SPI conversation | structured exchange | SHTC3 temp/humidity @0x70, SSD1306 OLED @0x3C |
 | `pulse_timing` | `time_pulse_us` choreography | timed dance | HC-SR04 ultrasonic |
-| `output` | drive PWM/GPIO, verify cross-modally | non-blocking `set(level)` | buzzer (GP20), relay (GP12) |
+| `output` | drive PWM/GPIO **or an I2C actuator**, verify cross-modally | non-blocking `set(level)` | buzzer (GP20), relay (GP12), servo (S1–S4 via I2C 0x22) |
 
 The `BringupSpec` handed to the LLM names the class **explicitly** — the model
 never guesses the mechanism.
@@ -77,14 +77,42 @@ Budget: `SELFAWARE_MAX_ATTEMPTS` (default 4) → soft reset → honest FAILED.
 | WS2812 RGB | GP6 | addressable — hard class, not a day-1 target |
 | DHT11 | GP11 | **older revisions only**; newer boards ship SHTC3 on I2C |
 | I2C0 | SDA GP4 / SCL GP5 | |
-| SSD1306 OLED | I2C 0x3C | on-board display — "device narrates itself" option |
-| SHTC3 | I2C 0x70 | UNCONFIRMED on some revisions |
-| Motor driver | GP21/GP22 | revision-dependent; some revisions via I2C 0x22 |
+| SSD1306 OLED | I2C 0x3C | on-board display — **the device narrates itself**: `hardware/oled_narrator.py` renders the live agentic work (active agent, the self-repair arc, readings + health) over the same host-authored raw-REPL exec path, replacing the factory temp/light demo |
+| SHTC3 | I2C 0x70 | **confirmed present** on the bench board (2026-07-04 scan) |
+| DC motors M1/M2 | I2C 0x22 | this board: TB6612 behind an I2C co-processor @0x22 (**not** direct GP21/22) |
+| Servo S1–S4 | I2C 0x22 | **not GPIOs** — servo channels on the same 0x22 co-processor (see below) |
 | IR | GP0 | |
+
+**Bench board, verified 2026-07-04:** Raspberry Pi Pico W / RP2040,
+MicroPython v1.27.0, onboard `picobricks.py` + `main.py`.
+`I2C(0, sda=GP4, scl=GP5).scan()` → `[0x22, 0x3c, 0x70]`.
 
 ADC-capable pins: **26, 27, 28** (`SELFAWARE_ADC_CAPABLE_PINS`).
 5V rule: the RP2040 is **not 5V-tolerant** — a bare HC-SR04 wants 5V Vcc with
 the echo line divided down to 3.3V.
+
+## The 0x22 motor/servo co-processor (verified on the bench board)
+
+DC motors **and** servos share ONE I2C command to the co-processor at 0x22 on
+`I2C(0, sda=GP4, scl=GP5)` — a 5-byte buffer, command `0x26`, XOR checksum:
+
+    buf = bytearray([0x26, sel, arg2, arg3, sel ^ arg2 ^ arg3])
+    i2c.writeto(0x22, buf, False)
+
+- **DC motor (M1/M2):** `sel` = motor number 1–2, `arg2` = speed (PWM byte),
+  `arg3` = direction; `speed=0` stops. (This is the `fan` preset.)
+- **Servo (S1–S4):** `sel` = `servoNumber + 2` (S1→3 … S4→6), `arg2` = 0,
+  `arg3` = angle `0–180`. (This is the `servo` preset.)
+
+Source of truth is the onboard `picobricks.py` (`MotorDriver.servo`); a
+gate-clean driver replicates it with raw `machine.I2C` so imports stay
+`machine, time` — no library import, exactly like the buzzer/fan presets.
+
+**A servo is still not auto-detectable.** 0x22 announces the *co-processor*
+(always present) — it says nothing about whether a servo is plugged into S1.
+Identity comes from a human declaring "servo on S1", the "teach it once" step.
+Verified live 2026-07-04: `servo(1, angle)` swept the horn 0°→180°→0° on S1,
+no traceback (soft verify + eyes).
 
 ## Engineering the fail→repair→pass demo (deterministic, not hoped-for)
 

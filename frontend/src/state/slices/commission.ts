@@ -5,7 +5,12 @@
  */
 
 import type { ProtocolClass, Stage, StageStatus } from '../../types/events';
-import type { StageRecord } from '../../types/domain';
+import type { ChatToolEntry, StageRecord } from '../../types/domain';
+
+export interface AttemptCode {
+  code: string;
+  isRepair: boolean;
+}
 
 export interface ActiveCommission {
   id: string;
@@ -17,10 +22,23 @@ export interface ActiveCommission {
   stage?: Stage | undefined;
   stageStatus?: StageStatus | undefined;
   trail: StageRecord[];
+  /** Generated driver source per attempt (commission.code) — failed attempts included. */
+  codeByAttempt: Record<number, AttemptCode>;
+  /** AUTHOR (attempt 1) / MEDIC (repairs) reasoning per attempt (agent.thought). */
+  thoughtsByAttempt: Record<number, string[]>;
+  /** Tools the agent called per attempt (agent.tool_call/result — e.g. dry_gate). */
+  toolsByAttempt: Record<number, ChatToolEntry[]>;
+  /** VERBATIM board stderr per attempt (commission.traceback). */
+  tracebackByAttempt: Record<number, string>;
   /** VERBATIM board stderr from the latest commission.traceback. */
   lastTraceback?: string | undefined;
   /** Set once commission.passed / .failed lands; kept for the final tableau. */
   outcome?: 'passed' | 'failed' | undefined;
+  /** From commission.passed — the verdict tableau's hero figures. */
+  finalReading?: number | null | undefined;
+  finalUnit?: string | undefined;
+  /** From commission.failed — the honest reason. */
+  failReason?: string | undefined;
 }
 
 export interface CommissionHistoryEntry {

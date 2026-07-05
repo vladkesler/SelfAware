@@ -8,14 +8,13 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Landing from './routes/Landing';
 import Console from './routes/Console';
-import '@fontsource/inter/300.css';
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/jetbrains-mono/400.css';
-import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource-variable/jetbrains-mono';
+import '@fontsource-variable/inter';
 import './styles/tokens.css';
 import './styles/base.css';
+import './styles/landing.css';
+import './styles/console.css';
+import './styles/theater.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

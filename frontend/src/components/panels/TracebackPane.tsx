@@ -1,7 +1,7 @@
 /**
  * TracebackPane — the machine's own voice. stderr lines are VERBATIM board
  * output: pre-wrap, never trimmed, never re-wrapped, in the reserved alert
- * red. meta lines narrate stage beats in muted phosphor.
+ * red. meta lines narrate stage beats in muted tone.
  */
 
 import { useEffect, useRef } from 'react';

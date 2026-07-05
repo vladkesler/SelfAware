@@ -1,11 +1,16 @@
 """MockBoard — the demo-without-hardware engine. FULLY WORKING today.
 
-Two modes, composable, checked in this order per exec:
+Three modes, composable, checked in this order per exec:
 
-  1. Scripted: a queue of ScriptedExchange consumed per exec — this is how the
+  1. Persistent I2C scan responder (opt-in via `scan_addrs`): any exec of the
+     host's I2C scan snippet gets the canned address list — every time, never
+     consuming the script. Discovery cards therefore appear on the FIRST
+     watcher tick and never vanish mid-demo (an exhausted script used to diff
+     to an empty scan -> device_lost).
+  2. Scripted: a queue of ScriptedExchange consumed per exec — this is how the
      fail -> repair -> pass demo runs offline (attempt 1 returns a genuine-
      looking board traceback, attempt 2 a plausible reading).
-  2. Simulated sensors: when no script entry claims the exec, regexes over the
+  3. Simulated sensors: when no script entry claims the exec, regexes over the
      exec'd CODE select a value generator (sine + noise per slug), so
      sensor.reading streams look alive and `stimulate(slug, delta)` can nudge
      a baseline for the liveness beat.
@@ -68,11 +73,18 @@ class SimulatedSensor:
 class MockBoard:
     """Implements BoardTransport with zero hardware. See module docstring."""
 
-    def __init__(self, script: list[ScriptedExchange] | None = None) -> None:
+    def __init__(
+        self,
+        script: list[ScriptedExchange] | None = None,
+        scan_addrs: list[int] | None = None,
+    ) -> None:
         self.port_id = MOCK_PORT_ID
         self.is_mock = True
         self._connected = False
         self._script: deque[ScriptedExchange] = deque(script or [])
+        # Persistent I2C presences: answered to EVERY `.scan()` exec, before the
+        # script queue and without consuming it (None = no responder, as before).
+        self._scan_addrs: list[int] | None = list(scan_addrs) if scan_addrs is not None else None
         self._sims: list[SimulatedSensor] = _default_simulators()
         self.exec_log: list[str] = []  # every exec'd payload, for tests/inspection
         self.soft_reset_count = 0
@@ -87,7 +99,8 @@ class MockBoard:
         self._connected = True
 
     async def exec(self, code: str, timeout_s: float) -> ExecResult:
-        """Scripted head first, then simulators, then a silent success.
+        """Scan responder first, then scripted head, then simulators, then a
+        silent success.
 
         Honors the host-timeout contract for real: an exchange whose delay_s
         exceeds timeout_s returns ExecResult(timed_out=True) after timeout_s —
@@ -95,6 +108,17 @@ class MockBoard:
         """
         started = time.monotonic()
         self.exec_log.append(code)
+
+        # Persistent scan responder: an I2C scan (host-authored snippet, see
+        # hardware/discovery.I2C_SCAN_SNIPPET) NEVER touches the script queue —
+        # the queue serves only the commission execs, so discovery cards cannot
+        # eat a demo beat or vanish when the script runs out.
+        if self._scan_addrs is not None and ".scan()" in code:
+            return ExecResult(
+                stdout=f"{self._scan_addrs}\n",
+                stderr="",
+                duration_s=time.monotonic() - started,
+            )
 
         exchange = self._claim_scripted(code)
         if exchange is not None:
@@ -108,6 +132,15 @@ class MockBoard:
                 stderr=exchange.stderr,
                 duration_s=time.monotonic() - started,
             )
+
+        # Host OUTPUT harness (build_output_payload, soft-verify): the actuator
+        # drivers (servo/buzzer/fan) write to the motor co-processor or a PWM pin
+        # and print nothing a regex sim can key on — but the host wraps them as
+        # `_act = Driver(); _act.set(1); ... print(0)`, so answer that marker with
+        # the print(0) sentinel and OUTPUT soft-verify passes. `_Verify` is the
+        # cross-modal (build-day) payload shape, which prints sample LISTS instead.
+        if "_act = Driver()" in code and "_Verify" not in code:
+            return ExecResult(stdout="0\n", stderr="", duration_s=time.monotonic() - started)
 
         for sim in self._sims:
             if sim.pattern.search(code):
@@ -165,11 +198,22 @@ def _default_simulators() -> list[SimulatedSensor]:
     """Generators keyed by regex over exec'd driver code.
 
     Patterns target what generated MicroPython actually contains: 'ADC(27)'
-    for the LDR, 'ADC(26)' for the pot, the SHTC3 address for the temp brick.
+    for the LDR, 'ADC(26)' for the pot, the SHTC3 address for the temp brick,
+    'time_pulse_us' for the HC-SR04. A sim SHORT-CIRCUITS the driver (it answers
+    the whole exec), so it must emit the sensor's FINAL reading in its display
+    unit — the LDR/pot bases are percentages (unit '%'), not raw u16 counts,
+    because their drivers normalize the ADC read to 0..100.
     """
     return [
-        SimulatedSensor(slug="ldr", pattern=re.compile(r"ADC\(\s*27\s*\)"), base=30000.0),
-        SimulatedSensor(slug="pot", pattern=re.compile(r"ADC\(\s*26\s*\)"), base=45000.0),
+        SimulatedSensor(slug="ldr", pattern=re.compile(r"ADC\(\s*27\s*\)"), base=55.0, amplitude=25.0, noise=2.0),
+        SimulatedSensor(slug="pot", pattern=re.compile(r"ADC\(\s*26\s*\)"), base=50.0, amplitude=35.0, period_s=9.0, noise=2.0),
+        # The "taught device" channel: GP28 is the one ADC-capable pin no preset
+        # claims (26=pot, 27=ldr), so any user-taught analog spec lands here and
+        # reads live offline. Emits the FINAL display-unit reading (a %, per the
+        # extra_context normalization convention); 47±9±noise stays well inside a
+        # 0..100 window and clear of the plausibility rail margin. Slug "soil"
+        # matches the demo schema so cmd.stimulate("soil", …) nudges it.
+        SimulatedSensor(slug="soil", pattern=re.compile(r"ADC\(\s*28\s*\)"), base=47.0, amplitude=9.0, period_s=8.0, noise=1.2),
         SimulatedSensor(
             slug="shtc3",
             pattern=re.compile(r"0x70|(?<!\d)112(?!\d)"),
@@ -177,10 +221,18 @@ def _default_simulators() -> list[SimulatedSensor]:
             amplitude=1.5,
             noise=0.1,
         ),
+        SimulatedSensor(
+            slug="ultrasonic",
+            pattern=re.compile(r"time_pulse_us"),
+            base=30.0,
+            amplitude=18.0,
+            period_s=6.0,
+            noise=1.5,  # ~12–48 cm: inside the 2..400 window, never a negative timeout sentinel
+        ),
     ]
 
 
-def demo_fail_then_pass_script(slug: str = "ldr") -> list[ScriptedExchange]:
+def demo_fail_then_pass_script(slug: str = "ldr", delay_s: float = 0.15) -> list[ScriptedExchange]:
     """The rehearsable demo arc: gate-passing code, board-raised failure, recovery.
 
     Attempt 1: the exec'd driver passed the static gate, but the *board*
@@ -190,7 +242,8 @@ def demo_fail_then_pass_script(slug: str = "ldr") -> list[ScriptedExchange]:
     signal the repair prompt embeds untouched. Attempt 2: a plausible,
     non-railed reading, so plausibility passes and the driver registers.
 
-    Theatrical delay_s so the UI stepper animates believably.
+    delay_s is the theatrical per-exec latency so the UI stepper animates
+    believably; the app factory passes settings.mock_pace_s (0 in tests).
     """
     return [
         ScriptedExchange(
@@ -202,11 +255,11 @@ def demo_fail_then_pass_script(slug: str = "ldr") -> list[ScriptedExchange]:
                 '  File "<stdin>", line 11, in read\n'
                 "AttributeError: 'ADC' object has no attribute 'read'\n"
             ),
-            delay_s=0.15,
+            delay_s=delay_s,
         ),
         ScriptedExchange(
             match=None,
-            stdout="41250\n",
-            delay_s=0.15,
+            stdout="58.5\n",  # a plausible LDR reading in its '%' unit (0..100 window), not railed
+            delay_s=delay_s,
         ),
     ]

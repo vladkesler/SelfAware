@@ -1,7 +1,10 @@
 /**
  * Landing — single-page site. Hero void, why-statement, About/Industry/Team
  * sections (reached via navbar anchors), footer. ?mock=1 is preserved into
- * /app through both the CTA and the navbar's Start Now link.
+ * /app through the hero CTA, the closing CTA, and the navbar's Start Now.
+ *
+ * Copy follows the console's own story (fail → verbatim traceback → repair →
+ * admitted): the page never claims more than the loop can prove.
  */
 
 import { useEffect } from 'react';
@@ -38,19 +41,19 @@ interface Fit {
 const FITS: Fit[] = [
   {
     title: 'Robotics',
-    body: 'Before a robot acts, it needs to know its sensors, actuators, and environment are reporting correctly.',
+    body: 'A robot should not wait for a firmware engineer every time it grows a new gripper. New hardware introduces itself, proves itself, and gets to work.',
   },
   {
     title: 'Labs',
-    body: 'Experiments need proof that devices are connected, calibrated, and producing reliable signals before results are trusted.',
+    body: 'An experiment is only as good as its instruments. Commission a probe in minutes — and keep the proof that it was reading truthfully when the data was taken.',
   },
   {
     title: 'Connected devices',
-    body: 'Hardware products need a repeatable way to validate sensors before they ship, update, or run in the field.',
+    body: 'Every product line ships new sensors on old firmware timelines. Turn bring-up from a sprint into a loop that runs while you watch.',
   },
   {
     title: 'Physical AI',
-    body: 'AI agents need verified access to real-world state before they can safely observe, decide, or act.',
+    body: 'An agent that acts on a lying sensor acts wrong with confidence. Give it hands that have already been checked against physics.',
   },
 ];
 
@@ -64,6 +67,8 @@ export default function Landing() {
     if (!location.hash) return;
     document.querySelector(location.hash)?.scrollIntoView({ behavior: 'smooth' });
   }, [location.hash]);
+
+  const consoleTo = { pathname: '/app', search: location.search };
 
   return (
     <>
@@ -82,8 +87,8 @@ export default function Landing() {
             <span className="landing__pitch-strong landing__pitch-accent">self-aware</span>.
           </h1>
           <TeaserStream />
-          <Link className="landing__cta machine" to={{ pathname: '/app', search: location.search }}>
-            &gt; start now<span className="landing__cursor">▌</span>
+          <Link className="landing__cta machine" to={consoleTo}>
+            &gt; enter the console<span className="landing__cursor">▌</span>
           </Link>
         </div>
       </main>
@@ -101,28 +106,45 @@ export default function Landing() {
           ref={aboutRef}
           className={`landing-about__content${aboutVisible ? ' is-visible' : ''}`}
         >
+          <p className="landing-section__eyebrow machine">about</p>
+          <h2 className="landing-section__lead">
+            Before AI can act in the physical world, it has to know what is real.
+          </h2>
           <div className="landing-about__body">
-            <p className="landing-about__lead">
-              Before AI can act in the physical world, it needs to know what is real.
-            </p>
-            <p>SelfAware is the verification loop for physical AI.</p>
             <p>
-              It helps devices prove that their sensors are connected, readable, plausible, and
-              trusted before software or AI depends on them.
+              A sensor that returns a number is not a sensor you can trust. A shorted pin reads
+              as a temperature. A floating wire reads as a heartbeat. A number that looks right
+              can still be a lie.
             </p>
             <p>
-              A sensor is not useful because it returns a number. It is useful when the system
-              can prove the hardware actually works.
-            </p>          </div>
+              SelfAware is the admission layer for physical AI. Plug in a device nobody wrote a
+              driver for, and an agent writes the driver, deploys it to a real board over USB
+              serial, and test-reads it on live hardware. When an attempt fails, the board's own
+              traceback — verbatim, never paraphrased — steers the repair.
+            </p>
+            <p>
+              Then the reading has to prove itself: sit in a plausible range, and move when the
+              world moves — cover the light sensor and the number must fall. Only then is the
+              driver admitted to the registry, where it becomes a live tool —{' '}
+              <code className="machine">read_ldr</code>, <code className="machine">set_relay</code>{' '}
+              — that any agent can call.
+            </p>
+            <p className="landing-about__close">
+              Others distribute trust. SelfAware manufactures it.
+            </p>
+          </div>
         </div>
       </section>
 
       <section id="industry" className="landing-section">
-        <h2 className="landing-about__lead">Every physical system is becoming software-defined.</h2>
+        <p className="landing-section__eyebrow machine">who it&apos;s for</p>
+        <h2 className="landing-section__lead">
+          Every physical system is becoming software-defined.
+        </h2>
         <div className="industry-lead">
           <p>
-            SelfAware is built for teams creating products where software does not just read
-            data, it depends on the physical world being true.
+            SelfAware is built for teams whose software does not just read data — it depends on
+            the physical world being true.
           </p>
         </div>
 
@@ -135,34 +157,28 @@ export default function Landing() {
           ))}
         </div>
 
-
-
-
-
         <div className="industry-provides">
           <LoopDiagram />
 
           <div className="industry-provides__content">
-            <h3 className="landing-about__lead">What SelfAware provides</h3>
-
+            <h3 className="landing-section__lead">From unknown wire to trusted tool</h3>
             <p className="industry-provides__text">
-              The old stack was dashboards, alerts, and manual debugging.
+              The old way: a human writes the driver, a human tests it, one device at a time —
+              and every agent downstream inherits their trust on faith.
             </p>
-
             <p className="industry-provides__text">
-              The next stack is physical capabilities that can be discovered, tested, trusted,
-              and called by software.
-              <br />
-
-              <br />
-              SelfAware turns raw sensors into trusted capabilities through a closed loop:
+              SelfAware closes the loop instead. The driver is generated, deployed to the live
+              board, observed, validated against physics, and only then registered as a callable
+              tool. Hardware gets admitted the way software got tools: discovered, tested,
+              trusted, called.
             </p>
           </div>
-        </div >
-      </section >
+        </div>
+      </section>
 
       <section id="team" className="landing-section">
-        <h2 className="landing-about__lead">Our team</h2>
+        <p className="landing-section__eyebrow machine">team</p>
+        <h2 className="landing-section__lead">Our team</h2>
         <div className="team-grid">
           {TEAM.map((member) => (
             <div className="team-card" key={member.name}>
@@ -189,15 +205,18 @@ export default function Landing() {
       </section>
 
       <section className="landing-section landing-closing">
-        <p className="landing-about__lead landing-closing__text">
+        <p className="landing-section__lead landing-closing__text">
           Reliability is a property of the loop, not the model.
         </p>
+        <Link className="landing__cta machine" to={consoleTo}>
+          &gt; enter the console<span className="landing__cursor">▌</span>
+        </Link>
       </section>
 
       <footer className="landing-footer">
         <div className="landing-footer__content">
           <span className="landing-footer__name machine">SelfAware</span>
-          <p className="landing-footer__tagline">The verification loop for physical AI.</p>
+          <p className="landing-footer__tagline">Verified hands for AI agents in the physical world.</p>
           <div className="landing-footer__socials">
             <a
               className="landing-footer__social"

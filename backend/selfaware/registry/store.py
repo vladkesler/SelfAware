@@ -226,18 +226,12 @@ class DriverRegistry:
                 toolset.add_function(
                     _make_set(record.slug),
                     name=f"set_{record.slug}",
-                    description=(
-                        f"Set {record.display_name} to a level (0 = off) via its verified driver."
-                    ),
+                    description=record.set_description(),
                 )
             else:
                 toolset.add_function(
                     _make_read(record.slug),
                     name=f"read_{record.slug}",
-                    description=(
-                        f"Take a live reading from {record.display_name}"
-                        + (f" (unit: {record.unit})" if record.unit else "")
-                        + " via its verified on-board driver."
-                    ),
+                    description=record.read_description(),
                 )
         return toolset

@@ -15,7 +15,7 @@ export function Navbar() {
   return (
     <header className={`navbar${scrolled ? ' navbar--scrolled' : ''}`}>
       <Link className="navbar__logo machine" to="/">
-        ◌ SelfAware
+        ◌ <span className="navbar__wordmark">SelfAware</span>
       </Link>
       <nav className="navbar__links machine">
         <a className="navbar__link" href="#about">

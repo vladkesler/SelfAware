@@ -17,7 +17,8 @@ MAX_FRAMES = 300  # hard cap so a broken stream fails the test instead of hangin
 
 
 def _settings() -> Settings:
-    return Settings(_env_file=None, mock_board=True, mock_author=True, poller_interval_s=60.0)
+    # mock_pace_s=0: theatrical demo pacing must never slow the suite.
+    return Settings(_env_file=None, mock_board=True, mock_author=True, poller_interval_s=60.0, mock_pace_s=0.0)
 
 
 def _drain_until(ws, event_type: str) -> list[dict]:
@@ -56,6 +57,21 @@ def test_hello_then_full_mock_commission_then_bad_frame_survives() -> None:
         assert "driver.registered" in types
         # traceback precedes registration precedes passed: the story is in order
         assert types.index("commission.traceback") < types.index("driver.registered")
+
+        # the agent's actual work is on the wire: reasoning + verbatim code
+        assert "agent.thought" in types
+        assert "commission.code" in types
+        assert types.index("agent.thought") < types.index("commission.code")
+        thoughts = [f["payload"] for f in frames if f["type"] == "agent.thought"]
+        # AUTHOR writes the first draft; MEDIC repairs from the verbatim traceback.
+        assert [t["agent"] for t in thoughts] == ["author", "medic"]
+        codes = [f["payload"] for f in frames if f["type"] == "commission.code"]
+        assert [c["attempt"] for c in codes] == [1, 2]
+        assert [c["is_repair"] for c in codes] == [False, True]
+        # e2e proof of the demo story: the ESP32 habit, then the repair
+        assert "adc.read()" in codes[0]["code"]
+        assert "read_u16" not in codes[0]["code"]
+        assert "read_u16" in codes[1]["code"]
         passed = frames[-1]["payload"]
         assert passed["slug"] == "ldr"
         assert passed["attempts_used"] == 2  # fail -> repair -> pass, per the demo script

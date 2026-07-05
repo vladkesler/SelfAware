@@ -33,6 +33,19 @@ export function isMockMode(): boolean {
   return import.meta.env.VITE_MOCK === '1';
 }
 
+/**
+ * True when `?hold=1`: the fixture player arms on start() but waits for a
+ * keypress/click — lets the presenter pre-stage the fallback tab silently.
+ * Only meaningful alongside `?mock=1`.
+ */
+export function isHoldMode(): boolean {
+  if (typeof window !== 'undefined') {
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get('hold') === '1') return true;
+  }
+  return false;
+}
+
 let singleton: EventTransport | null = null;
 
 export function createTransport(
@@ -45,6 +58,7 @@ export function createTransport(
     singleton = new FixturePlayer(commissionLdr as unknown as FixtureEntry[], {
       onEvent: sink,
       onStatus,
+      hold: isHoldMode(),
     });
   } else {
     const url = (import.meta.env.VITE_WS_URL as string | undefined) ?? 'ws://localhost:8000/ws';
